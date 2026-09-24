@@ -208,6 +208,14 @@ def score_all(db: DB, cfg: dict) -> list[dict]:
         hist = db.price_history(lst["id"])
         # Manual overrides from data/notes.yaml: est_rent on the listing, cost items on the neighborhood profile.
         ov = (notes.get(lst["id"]) or {}).get("overrides") or {}
+        if ov.get("property_type"):  # e.g. a mis-tagged MULTI_FAMILY that is really a house with an ADU
+            lst["property_type"] = str(ov["property_type"])
+            grp = type_group(lst["property_type"])
+            ck = f"{nb}|{grp}"
+            if ck not in comps_cache:
+                c = comp_stats(db, nb, sc["comps_window_months"], sc["comps_min_count"], grp) if nb else {}
+                c["active_median_dom"] = active_dom_median(db, nb) if nb else None
+                comps_cache[ck] = c
         nb_cfg = dict(cfg["neighborhoods"].get(nb) or {})
         if ov.get("est_rent"):
             lst["est_rent"] = float(ov["est_rent"])

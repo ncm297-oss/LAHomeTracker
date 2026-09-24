@@ -92,11 +92,11 @@
     var flagged = data.meta.red_flags.filter(function (f) { return l.flags[f] === true; });
     var hist = (l.price_history || []).map(function (h) { return esc(h.date) + ' ' + money(h.price, true) + (h.event !== 'list' ? ' (' + esc(h.event) + ')' : ''); }).join(' → ');
     return '<details class="listing"><summary>' +
-      '<span class="score ' + (l.score >= 70 ? 'hi' : l.score >= 50 ? 'mid' : 'lo') + '">' + (l.score !== null && l.score !== undefined ? Math.round(l.score) : '–') + '</span>' +
+      '<span class="score ' + (l.score >= 70 ? 'hi' : l.score >= 50 ? 'mid' : 'lo') + '" title="' + Math.round((l.coverage || 0) * 6) + ' of 6 signals have data">' + (l.score !== null && l.score !== undefined ? Math.round(l.score) : '–') + (l.coverage !== null && l.coverage !== undefined && l.coverage < 0.7 ? '<small>?</small>' : '') + '</span>' +
       '<span class="addr">' + esc(l.address) + '<small>' + esc(nb.name || l.city || '') + (l.status !== 'active' ? ' · ' + esc(l.status) : '') + '</small></span>' +
       '<span class="price">' + money(l.list_price, true) + '<small>' + (l.sqft ? money(l.list_price / l.sqft) + '/sf' : '') + (cut > 0.001 ? ' · −' + pct(cut, 0) : '') + '</small></span>' +
       '</summary><div class="body">' +
-      '<div class="verdict-line">' + esc(l.verdict || 'not scored yet') + '</div>' +
+      '<div class="verdict-line">' + esc(l.verdict || 'not scored yet') + (l.coverage !== null && l.coverage !== undefined ? ' <small>(' + Math.round(l.coverage * 6) + '/6 signals)</small>' : '') + '</div>' +
       '<div class="facts">' + [
         l.property_type ? String(l.property_type).replace(/_/g, ' ').toLowerCase() : '',
         l.beds ? l.beds + ' bd' : '', l.baths ? l.baths + ' ba' : '', l.sqft ? Math.round(l.sqft).toLocaleString() + ' sf' : '',

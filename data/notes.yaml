@@ -1,4 +1,4 @@
-﻿# Red-flag checklist, notes and per-listing cost overrides, keyed by listing id.
-# Edit by hand or with: python -m tracker note <id|address> --flag fire_zone=false --text 'agent says FAIR Plan only' --override insurance=18000
-{}
-
+b70aa8c8330d770f:
+  notes: Realtor.com tags MULTI_FAMILY; treating as house pending a look at the listing
+  overrides:
+    property_type: SINGLE_FAMILY
