@@ -164,7 +164,7 @@
     });
   }
 
-  var raf = null;
+  var timer = null;
   function render() {
     var p = readParams();
     if (p.years < 1) p.years = 1;
@@ -175,9 +175,11 @@
     renderSensitivity(p);
     renderYearly(p, sim);
     markPreset(p);
-    history.replaceState(null, '', location.pathname + location.search + toHash(p));
+    var h = toHash(p);
+    history.replaceState(null, '', location.pathname + location.search + h);
+    $('#to-finance').href = 'finance.html' + h;
   }
-  function schedule() { if (raf) cancelAnimationFrame(raf); raf = requestAnimationFrame(render); }
+  function schedule() { clearTimeout(timer); timer = setTimeout(render, 30); }
 
   // ---------- events ----------
   inputs.forEach(function (el) {

@@ -80,6 +80,23 @@ td.neg { color: var(--bad); font-weight: 600; }
 tr.detail td { text-align: left; background: var(--bg); font-size: .8rem; color: var(--muted); padding: 0; }
 tr.detail td > div { position: sticky; left: 0; width: min(100%, calc(100vw - 66px)); max-width: 726px; white-space: normal; padding: 8px; }
 tr.detail td b { color: var(--text); }
+.cards { display: flex; gap: 10px; padding-bottom: 6px; }
+.scen { flex: 0 0 230px; border: 1px solid var(--line); border-radius: 10px; padding: 12px; background: var(--bg); }
+.scen.base { border-color: var(--accent); }
+.scen.grey { opacity: .55; }
+.scen .name { font-weight: 600; margin-bottom: 4px; }
+.scen .big { font-size: 1.5rem; font-weight: 700; }
+.scen .big.pos { color: var(--good); } .scen .big.neg { color: var(--bad); }
+.scen .k { color: var(--muted); font-size: .75rem; margin-bottom: 8px; }
+.scen .line { display: flex; justify-content: space-between; font-size: .82rem; padding: 2px 0; border-top: 1px solid var(--line); }
+.scen .line span { color: var(--muted); }
+.scen .line b.pos { color: var(--good); } .scen .line b.neg { color: var(--bad); }
+.scen .verdict-line { font-size: .8rem; margin-top: 8px; color: var(--text); }
+.tag { font-size: .65rem; padding: 1px 6px; border-radius: 999px; border: 1px solid var(--accent); color: var(--accent); vertical-align: middle; }
+.tag.bad { border-color: var(--bad); color: var(--bad); }
+input[type="range"] { padding: 0; accent-color: var(--accent); }
+.v.pos { color: var(--good); } .v.neg { color: var(--bad); }
+.cta { display: inline-block; margin: 4px 0 12px; padding: 10px 14px; border-radius: 8px; background: var(--accent); color: #fff; text-decoration: none; font-weight: 600; }
 .how ol { padding-left: 20px; margin: 0; font-size: .9rem; }
 .how li { margin-bottom: 6px; }
 code { font-size: .85em; }

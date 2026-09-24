@@ -7,7 +7,7 @@ Built in phases:
 | Phase | What | Status |
 |---|---|---|
 | 1 | Buy vs rent breakeven calculator (static page) | done |
-| 1B | Financing scenarios (mortgage, delayed financing, DTI, deductions) | next |
+| 1B | Financing scenarios (mortgage, delayed financing, DTI, deductions) | done |
 | 2 | SQLite listing tracker with deal scoring, market panel, rate monitoring | planned |
 | 3 | Weekly automated triage + email digest | planned |
 
@@ -18,6 +18,15 @@ Everything is in `docs/` so GitHub Pages can serve it straight from the `main` b
 - `docs/index.html`, `docs/style.css`, `docs/app.js` — the page. No build step, no dependencies, nothing leaves the browser.
 - `docs/calc.js` — the engine. Pure functions, shared with the tests and reused by later phases.
 - `tests/calc.test.js` — engine tests.
+
+## Phase 1B: financing scenarios
+
+`docs/finance.html` (+ `finance.js`, engine in `docs/mortgage.js`). Reached from the "Model financing" button; the URL hash carries the deal both ways.
+
+- Five fixed scenarios (100% cash, 75% down, 50% down, DTI-max loan, cash-then-refi in year N) plus a custom down-payment slider, each with wealth difference vs renting, delta vs 100% cash, loan/rate (jumbo above the $1,249,125 conforming limit), cash at close, cash kept invested, year-1 monthly cost before and after deductions, and a one-line verdict. Scenarios whose loan exceeds the 43%-DTI limit are greyed.
+- Retained cash earns its own return (equities 7% taxed at sale by default, or the Treasuries opportunity rate taxed yearly).
+- Itemized deductions: SALT (property tax + CA income tax, capped at $40,400) and mortgage interest on the first $750K (federal) / $1M (CA), versus the standard deduction. A cash buyer gets the property-tax piece, which is why the all-cash figure here is a few thousand a year better than on the cash page unless you switch to the standard deduction.
+- Crossover panel: after-tax cost of the loan vs after-tax return on retained cash, and the mortgage rate at which they tie.
 
 ### Run locally
 

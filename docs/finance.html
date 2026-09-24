@@ -1,0 +1,172 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Financing Scenarios — West LA</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>Financing scenarios</h1>
+  <p class="sub"><a id="back" href="index.html">← Cash calculator</a> · Same deal, five ways to pay for it. Settings live in the link.</p>
+</header>
+
+<main>
+  <section class="card" id="deal-summary">
+    <div class="metrics">
+      <div><span class="k">Deal</span><span class="v" id="d-deal">—</span></div>
+      <div><span class="k">Cash on hand needed (100% cash)</span><span class="v" id="d-w0">—</span></div>
+      <div><span class="k">Largest loan at 43% DTI</span><span class="v" id="d-dti">—</span></div>
+      <div><span class="k">Jumbo above</span><span class="v" id="d-jumbo">—</span></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Scenarios</h2>
+    <p class="hint">Wealth difference vs renting after the hold, and how each compares with paying all cash. Monthly figure is year-1 P&amp;I + tax + insurance + maintenance + HOA, before any deduction. Rent band $6–8K for reference.</p>
+    <div class="scroll"><div class="cards" id="scenarios"></div></div>
+  </section>
+
+  <section class="card" id="crossover">
+    <h2>Does leverage pay?</h2>
+    <div class="metrics">
+      <div><span class="k">After-tax cost of borrowing</span><span class="v" id="x-loan">—</span></div>
+      <div><span class="k">After-tax return on retained cash</span><span class="v" id="x-ret">—</span></div>
+      <div><span class="k">Mortgage rate at which they tie</span><span class="v" id="x-rate">—</span></div>
+      <div><span class="k">Verdict</span><span class="v" id="x-verdict">—</span></div>
+    </div>
+    <p class="hint" id="x-note"></p>
+  </section>
+
+  <form id="inputs" autocomplete="off">
+    <details open class="card">
+      <summary>Loan terms</summary>
+      <label>Custom scenario: down payment <span class="unit" id="down-label">50%</span>
+        <input type="range" data-k="downPct" data-t="pct" min="20" max="100" step="5">
+      </label>
+      <div class="row2">
+        <label>Term
+          <select data-k="term" data-t="int"><option value="30">30-year</option><option value="15">15-year</option></select>
+        </label>
+        <label>Points <span class="unit">% of loan</span><input data-k="points" data-t="pct" inputmode="decimal" step="0.125"></label>
+      </div>
+      <div class="row2">
+        <label>Conforming rate <span class="unit">%</span><input data-k="conformingRate" data-t="pct" inputmode="decimal" step="0.05"></label>
+        <label>Jumbo rate <span class="unit">%</span><input data-k="jumboRate" data-t="pct" inputmode="decimal" step="0.05"></label>
+      </div>
+      <div class="row2">
+        <label>Loan closing costs <span class="unit">% of loan</span><input data-k="loanClosing" data-t="pct" inputmode="decimal" step="0.1"></label>
+        <label>Conforming limit <span class="unit">$</span><input data-k="conformingLimit" data-t="money" inputmode="numeric"></label>
+      </div>
+    </details>
+
+    <details open class="card">
+      <summary>Cash now, finance later</summary>
+      <p class="hint">The "cash, refi" scenario buys with cash, then takes a cash-out / delayed-financing loan at the end of year N. Refi cost ~1.5% of the loan.</p>
+      <div class="row2">
+        <label>Refi year <span class="unit">N</span><input data-k="refiYear" data-t="int" inputmode="numeric" min="1"></label>
+        <label>Loan <span class="unit">% of price</span><input data-k="refiPct" data-t="pct" inputmode="decimal" step="5"></label>
+      </div>
+      <div class="row2">
+        <label>Refi rate <span class="unit">%</span><input data-k="refiRate" data-t="pct" inputmode="decimal" step="0.05"></label>
+        <label>Refi cost <span class="unit">% of loan</span><input data-k="refiCost" data-t="pct" inputmode="decimal" step="0.1"></label>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary>Income and lender limits</summary>
+      <div class="row2">
+        <label>Household gross income <span class="unit">$ / yr</span><input data-k="income" data-t="money" inputmode="numeric"></label>
+        <label>Max DTI <span class="unit">%</span><input data-k="maxDti" data-t="pct" inputmode="decimal" step="1"></label>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary>Retained cash</summary>
+      <div class="presets" role="group" aria-label="Where the retained cash sits">
+        <button type="button" data-rpreset="equities">Equities (7%, taxed at sale)</button>
+        <button type="button" data-rpreset="treasuries">Treasuries (opportunity rate, taxed yearly)</button>
+      </div>
+      <label>Expected return on cash you keep <span class="unit">% / yr pre-tax</span><input data-k="retainedRate" data-t="pct" inputmode="decimal" step="0.1"></label>
+      <label>Tax on that return
+        <select data-k="retainedTaxMode">
+          <option value="deferred">After-tax: gains taxed once at sale (equities)</option>
+          <option value="annual">After-tax: taxed every year, federal only (Treasuries)</option>
+          <option value="pretax">Pre-tax</option>
+        </select>
+      </label>
+    </details>
+
+    <details class="card">
+      <summary>Deductions</summary>
+      <label>Deduction method
+        <select data-k="itemize" data-t="int"><option value="1">Itemize (SALT + mortgage interest)</option><option value="0">Standard deduction</option></select>
+      </label>
+      <div class="row2">
+        <label>SALT cap <span class="unit">$</span><input data-k="saltCap" data-t="money" inputmode="numeric"></label>
+        <label>CA income tax already in SALT <span class="unit">$</span><input data-k="stateIncomeTax" data-t="money" inputmode="numeric"></label>
+      </div>
+      <div class="row2">
+        <label>Federal standard deduction <span class="unit">$</span><input data-k="fedStd" data-t="money" inputmode="numeric"></label>
+        <label>CA standard deduction <span class="unit">$</span><input data-k="caStd" data-t="money" inputmode="numeric"></label>
+      </div>
+      <div class="row2">
+        <label>Federal interest cap <span class="unit">$ principal</span><input data-k="fedInterestCap" data-t="money" inputmode="numeric"></label>
+        <label>CA interest cap <span class="unit">$ principal</span><input data-k="caInterestCap" data-t="money" inputmode="numeric"></label>
+      </div>
+      <p class="hint">2026 SALT cap is $40,400 and phases down above $505K MAGI. Your CA income tax already uses ~$22K of it, so only ~$18K of property tax is federally deductible. Interest on principal above $750K (federal) / $1M (CA) is not deductible.</p>
+    </details>
+
+    <details class="card">
+      <summary>Deal inputs (from the cash calculator)</summary>
+      <div class="row2">
+        <label>Purchase price <span class="unit">$</span><input data-k="price" data-t="money" inputmode="numeric"></label>
+        <label>Comparable rent <span class="unit">$/mo</span><input data-k="rent" data-t="money" inputmode="numeric"></label>
+      </div>
+      <div class="row2">
+        <label>Hold <span class="unit">years</span><input data-k="years" data-t="int" inputmode="numeric"></label>
+        <label>Appreciation <span class="unit">%/yr</span><input data-k="appreciation" data-t="pct" inputmode="decimal" step="0.1"></label>
+      </div>
+      <div class="row2">
+        <label>Property tax <span class="unit">%</span><input data-k="propTaxRate" data-t="pct" inputmode="decimal" step="0.01"></label>
+        <label>Fire insurance <span class="unit">$/yr</span><input data-k="insurance" data-t="money" inputmode="numeric"></label>
+      </div>
+      <div class="row2">
+        <label>Opportunity rate (renter) <span class="unit">%</span><input data-k="oppRate" data-t="pct" inputmode="decimal" step="0.1"></label>
+        <label>Sell costs <span class="unit">%</span><input data-k="sellClose" data-t="pct" inputmode="decimal" step="0.1"></label>
+      </div>
+      <p class="hint">Everything else (neighborhood, HOA, growth rates, tax rates) carries over from the cash calculator link. <a id="back2" href="index.html">Edit there</a>.</p>
+      <button type="button" id="reset" class="ghost">Reset financing defaults</button>
+    </details>
+  </form>
+
+  <section class="card">
+    <h2>Year by year</h2>
+    <label>Scenario <select id="detail-scenario"></select></label>
+    <p class="hint">Tap a row for the math.</p>
+    <div class="scroll"><table id="yearly"></table></div>
+  </section>
+
+  <section class="card how">
+    <h2>How financing changes the math</h2>
+    <ol>
+      <li>With a loan you put only the down payment plus loan costs into the house. The rest of the cash stays invested at the retained-cash return (<b>R</b>).</li>
+      <li>Owner outflow each year = property tax + insurance + maintenance + HOA + P&amp;I − tax benefit. The tax benefit is what itemizing (capped SALT + deductible interest) saves versus the standard deduction, federal and California separately. Even a cash buyer gets the property-tax part.</li>
+      <li>As in the cash calculator, whoever pays less each year invests the difference in the renter's portfolio.</li>
+      <li>At sale the owner nets home proceeds − remaining loan balance + R after tax. <b>Wealth difference = owner net − renter net.</b></li>
+      <li>"Cash, refi" buys with cash and borrows at the end of year N; the proceeds (less refi cost) go into R and payments start the next year.</li>
+      <li>Leverage only helps if the after-tax loan rate is below the after-tax return on R. The crossover panel shows both and the mortgage rate at which they tie.</li>
+    </ol>
+  </section>
+</main>
+
+<footer><small>Phase 1B · calculations in <code>mortgage.js</code> + <code>calc.js</code> · nothing leaves your browser</small></footer>
+
+<script src="assumptions.js"></script>
+<script src="calc.js"></script>
+<script src="mortgage.js"></script>
+<script src="finance.js"></script>
+</body>
+</html>
