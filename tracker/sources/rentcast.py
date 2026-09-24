@@ -34,12 +34,23 @@ class RentCast(SourceAdapter):
     def enabled(self) -> bool:
         return super().enabled and bool(self.key)
 
+    _dead: str | None = None  # set after an auth/billing error so a run can't burn the quota on repeats
+
     def _get(self, path: str, params: dict, ttl_hours: float, endpoint: str):
         if not self.key:
             raise SourceError("RENTCAST_API_KEY not set")
-        return self.cached_get(f"{self.base}{path}", params=params,
-                               headers={"X-Api-Key": self.key, "Accept": "application/json"},
-                               ttl_hours=ttl_hours, endpoint=endpoint)
+        if self._dead:
+            raise SourceError(f"rentcast disabled for this run: {self._dead}")
+        try:
+            return self.cached_get(f"{self.base}{path}", params=params,
+                                   headers={"X-Api-Key": self.key, "Accept": "application/json"},
+                                   ttl_hours=ttl_hours, endpoint=endpoint)
+        except SourceError as e:
+            msg = str(e)
+            if "HTTP 401" in msg or "HTTP 403" in msg or "HTTP 429" in msg:
+                self._dead = msg[:160]
+                log.warning("rentcast: %s -- skipping further RentCast calls this run", self._dead)
+            raise
 
     # ---- listings ----
     def fetch_listings(self, neighborhood: str) -> list[Listing]:
