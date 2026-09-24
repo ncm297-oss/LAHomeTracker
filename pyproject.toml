@@ -1,0 +1,25 @@
+[project]
+name = "lahometracker"
+version = "0.2.0"
+description = "West Side LA housing tracker: listings, comps, scoring, rates, weekly digest"
+requires-python = ">=3.12"
+dependencies = [
+    "requests>=2.31",
+    "pyyaml>=6",
+    "python-dotenv>=1",
+]
+
+[project.optional-dependencies]
+gmail = ["google-api-python-client>=2", "google-auth-oauthlib>=1"]
+homeharvest = ["homeharvest>=0.4"]
+dev = ["pytest>=8"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+python_files = "test_*.py"
+
+[tool.setuptools]
+packages = ["tracker", "tracker.sources"]
+
+[tool.setuptools.package-data]
+tracker = ["config.yaml"]

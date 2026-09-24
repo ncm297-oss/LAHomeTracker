@@ -1,0 +1,50 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Listing Tracker — West LA</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>Listing tracker</h1>
+  <p class="sub"><a href="index.html">Cash calculator</a> · <a href="finance.html">Financing</a> · <span id="generated">loading…</span></p>
+</header>
+
+<main>
+  <section id="alerts"></section>
+
+  <section class="card">
+    <h2>Market</h2>
+    <div class="charts" id="rate-charts"></div>
+    <div class="charts" id="market-charts"></div>
+    <p class="hint" id="market-note"></p>
+  </section>
+
+  <section class="card">
+    <h2>Listings</h2>
+    <div class="filters">
+      <label>Neighborhood <select id="f-nb"><option value="">All</option></select></label>
+      <label>Min score <input type="number" id="f-score" value="0" min="0" max="100" step="5"></label>
+      <label>Status <select id="f-status"><option value="active">Active</option><option value="pending">Pending</option><option value="">All</option></select></label>
+      <label>Sort <select id="f-sort"><option value="score">Score</option><option value="price">Price</option><option value="ppsf">$/sqft</option><option value="dom">Days on market</option><option value="cut">Price cut %</option></select></label>
+    </div>
+    <p class="hint" id="count"></p>
+    <div id="listings"></div>
+  </section>
+
+  <section class="card">
+    <h2>Data sources</h2>
+    <div id="meta"></div>
+    <p class="hint">Data is refreshed by the weekly job (<code>python -m tracker run-weekly</code>) and written to <code>docs/data/*.json</code>. Red-flag checklist and notes live in <code>data/notes.yaml</code>.</p>
+  </section>
+</main>
+
+<footer><small>Phase 2 · static dashboard, no backend</small></footer>
+
+<script src="assumptions.js"></script>
+<script src="dashboard.js"></script>
+</body>
+</html>

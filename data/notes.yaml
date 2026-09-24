@@ -1,0 +1,4 @@
+﻿# Red-flag checklist, notes and per-listing cost overrides, keyed by listing id.
+# Edit by hand or with: python -m tracker note <id|address> --flag fire_zone=false --text 'agent says FAIR Plan only' --override insurance=18000
+{}
+

@@ -1,0 +1,5 @@
+﻿# Saved financing scenarios for the refi / delayed-financing alert (rate in percent).
+scenarios:
+  - name: 50% down jumbo at purchase
+    rate: 7.3
+

@@ -1,0 +1,64 @@
+[
+ {
+  "input": {},
+  "finalDiff": -492690.7941210619,
+  "breakevenPrice": 1409814.2291213782,
+  "rentEquivalent": 11653.296115607023
+ },
+ {
+  "input": {
+   "price": 2000000,
+   "rent": 6000,
+   "years": 5
+  },
+  "finalDiff": -288200.8853532062,
+  "breakevenPrice": 1090327.7260758616,
+  "rentEquivalent": 10122.236864127328
+ },
+ {
+  "input": {
+   "price": 3200000,
+   "rent": 8000,
+   "years": 10,
+   "appreciation": 0.05
+  },
+  "finalDiff": -599113.3727137083,
+  "breakevenPrice": 2235328.726382003,
+  "rentEquivalent": 11511.435573528091
+ },
+ {
+  "input": {
+   "price": 2500000,
+   "rent": 7000,
+   "oppRate": 0.045,
+   "oppTaxMode": "annual"
+  },
+  "finalDiff": -130810.09823806584,
+  "breakevenPrice": 2067968.2035723482,
+  "rentEquivalent": 8288.315784240884
+ },
+ {
+  "input": {
+   "price": 2800000,
+   "rent": 9000,
+   "propTaxRate": 0.0129,
+   "insurance": 15000,
+   "hoa": 400,
+   "earthquake": 5000
+  },
+  "finalDiff": -568709.2819857951,
+  "breakevenPrice": 1562739.18970682,
+  "rentEquivalent": 14371.26474525503
+ },
+ {
+  "input": {
+   "price": 1500000,
+   "rent": 7000,
+   "oppTaxMode": "pretax",
+   "sellClose": 0.066
+  },
+  "finalDiff": -319796.4162790724,
+  "breakevenPrice": 1027499.431442024,
+  "rentEquivalent": 9835.771404776613
+ }
+]

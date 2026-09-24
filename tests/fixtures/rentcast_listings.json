@@ -1,0 +1,51 @@
+[
+  {
+    "id": "2417-Pearl-St,-Santa-Monica,-CA-90405",
+    "formattedAddress": "2417 Pearl St, Santa Monica, CA 90405",
+    "addressLine1": "2417 Pearl St",
+    "city": "Santa Monica",
+    "state": "CA",
+    "zipCode": "90405",
+    "county": "Los Angeles",
+    "latitude": 34.0181,
+    "longitude": -118.47,
+    "propertyType": "Single Family",
+    "bedrooms": 3,
+    "bathrooms": 2,
+    "squareFootage": 1650,
+    "lotSize": 5200,
+    "yearBuilt": 1948,
+    "status": "Active",
+    "price": 2495000,
+    "listingType": "Standard",
+    "listedDate": "2026-08-14T00:00:00.000Z",
+    "createdDate": "2026-08-14T00:00:00.000Z",
+    "lastSeenDate": "2026-09-23T00:00:00.000Z",
+    "daysOnMarket": 41,
+    "mlsName": "CRMLS",
+    "mlsNumber": "26-512345",
+    "listingAgent": {"name": "Agent Example"},
+    "history": {
+      "2026-08-14": {"event": "Sale Listing", "price": 2695000, "listingType": "Standard", "listedDate": "2026-08-14T00:00:00.000Z", "daysOnMarket": 0},
+      "2026-09-10": {"event": "Sale Listing", "price": 2495000, "listingType": "Standard", "listedDate": "2026-08-14T00:00:00.000Z", "daysOnMarket": 27}
+    }
+  },
+  {
+    "id": "999-Ocean-Ave,-Santa-Monica,-CA-90402",
+    "formattedAddress": "999 Ocean Ave, Santa Monica, CA 90402",
+    "addressLine1": "999 Ocean Ave",
+    "city": "Santa Monica",
+    "state": "CA",
+    "zipCode": "90402",
+    "propertyType": "Condo",
+    "bedrooms": 2,
+    "bathrooms": 2,
+    "squareFootage": 1400,
+    "status": "Active",
+    "price": 9500000,
+    "listedDate": "2026-09-01T00:00:00.000Z",
+    "daysOnMarket": 22,
+    "mlsNumber": "26-600000",
+    "history": {}
+  }
+]

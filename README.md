@@ -8,8 +8,8 @@ Built in phases:
 |---|---|---|
 | 1 | Buy vs rent breakeven calculator (static page) | done |
 | 1B | Financing scenarios (mortgage, delayed financing, DTI, deductions) | done |
-| 2 | SQLite listing tracker with deal scoring, market panel, rate monitoring | planned |
-| 3 | Weekly automated triage + email digest | planned |
+| 2 | SQLite listing tracker with deal scoring, market panel, rate monitoring | done |
+| 3 | Weekly automated triage + email digest (GitHub Actions) | done — needs secrets |
 
 ## Phase 1: the calculator
 
@@ -76,8 +76,63 @@ Defaults live in `docs/calc.js` (`DEFAULTS`) and per-neighborhood data in `docs/
 | Marginal rates | 24% federal, 9.3% CA | $330K MFJ gross | — |
 | SALT / mortgage deduction | not yet (Phase 1B) | 2026 SALT cap $40,400, phases down above $505K MAGI; matters for a cash buyer's property tax too | [Taxstra SALT](https://taxstra.com/salt-deduction/) |
 
-## Later phases (setup notes will land here)
+## Phase 2: listing tracker
 
-- RentCast API key, Gmail read-only OAuth, FRED API key
-- Where to drop Redfin CSV exports and Zillow Research / Redfin Data Center files
-- Running the weekly job locally before scheduling it
+Python package `tracker/` (stdlib + `requests`, `pyyaml`, `python-dotenv`; optional `homeharvest` and the Gmail client). SQLite at `data/tracker.sqlite`. Every source is an adapter in `tracker/sources/` that can be disabled in `tracker/config.yaml` without touching scoring or the calculator.
+
+```bash
+pip install -e ".[gmail,homeharvest,dev]"
+```
+
+### Setup
+
+1. **Secrets** go in `.env` (gitignored) locally and in GitHub repository secrets for the weekly job:
+   - `RENTCAST_API_KEY` — from https://app.rentcast.io/app/api. The key alone is not enough: the account must have an active plan selected (the free Developer tier counts), otherwise every call returns `billing/subscription-inactive`.
+   - `FRED_API_KEY` — optional; without it the tracker uses the public `fredgraph.csv` endpoint, which serves the same series.
+   - `GMAIL_TOKEN_JSON` and `DIGEST_TO` — see Phase 3.
+2. **Redfin CSV exports**: on a Redfin search page use "Download All" and drop the CSV in `data/inbox/`. Active rows become listings, sold rows become comps. Do one export per neighborhood for sold homes in the last 9–12 months to seed comps if HomeHarvest is blocked.
+3. **Redfin Data Center** (optional): download `zip_code_market_tracker.tsv000.gz` from https://www.redfin.com/news/data-center/ into `data/inbox/` and run `python -m tracker import-redfin-dc`. Zillow Research files are fetched automatically.
+
+### Commands
+
+```bash
+python -m tracker init                         # create data/ and the database
+python -m tracker pull [--neighborhood X]      # active listings: RentCast, HomeHarvest fallback
+python -m tracker import-csv                   # data/inbox/*.csv (Redfin exports)
+python -m tracker comps                        # sold comps (HomeHarvest) + RentCast zip medians
+python -m tracker enrich --limit 20            # RentCast rent AVM + last-sale record for listings missing them
+python -m tracker score --top 20               # rescore everything
+python -m tracker rates                        # FRED rate series + rate alerts
+python -m tracker market                       # FRED LA County series + Zillow Research files
+python -m tracker export                       # docs/data/*.json for the dashboard
+python -m tracker note "2417 Pearl" --flag fire_zone=false --text "agent: standard HO-3 available" --override insurance=8500
+python -m tracker add --address "123 Main St" --city "Santa Monica" --zip 90405 --price 2400000 --rent 8000
+python -m tracker status                       # request counts per source (for plan sizing)
+```
+
+### Scoring (0–100)
+
+Weighted mean of the components that have data (weights in `config.yaml`): $/sqft vs sold-comp median in the neighborhood (falls back to RentCast zip medians), cumulative price cut and number of cuts, days on market vs neighborhood median, asking below the seller's last purchase price, gross rent yield (flag ≥ 4%), and the Phase 1 breakeven price vs asking (same math as the page, ported to `tracker/buyrent.py` with a parity test). Rent yield and breakeven need a rent estimate, which comes from RentCast's AVM or a manual `--override est_rent=`.
+
+### Dashboard
+
+`docs/dashboard.html` reads `docs/data/*.json`: rate alerts, FRED/Zillow/Redfin market charts, ranked listings with component bars, price history, the red-flag checklist (fire zone, insurability, hillside/geotech, unpermitted work, freeway/flight path, HOA/litigation, tenant), notes, and one-click links that open the listing in the cash or financing calculator with its neighborhood cost profile pre-filled.
+
+## Phase 3: weekly job + digest
+
+`.github/workflows/weekly.yml` runs Mondays 06:00 Pacific (and on demand via *Run workflow*): pull listings → import Redfin CSVs and Gmail alerts → monthly comps refresh → rent/last-sale enrichment → rescore → rates + market → export → digest email, then commits `data/tracker.sqlite` and `docs/data/*.json` back to `main` so the Pages dashboard updates itself.
+
+### Gmail (read alerts + send the digest)
+
+1. In Google Cloud Console create a project, enable the **Gmail API**, and create an OAuth client of type **Desktop app**. Download it as `credentials.json` into the repo root (gitignored).
+2. Run `python -m tracker gmail-auth` once. It opens a browser, asks for `gmail.readonly` + `gmail.send`, and writes `token.json` (gitignored).
+3. For GitHub Actions, store the token as a secret: `GMAIL_TOKEN_JSON` = the contents of `token.json` (raw JSON or base64), and `DIGEST_TO` = your address. Without `GMAIL_TOKEN_JSON` the job runs in dry-run mode and prints the digest to the log.
+4. Saved-search alert emails from Redfin, Zillow and any MLS client portal are matched by `sources.gmail.query` in `config.yaml`; the parser pulls address, price, previous price, MLS# and URL out of the body. The job never touches the mailbox beyond reading matching messages and sending the digest.
+
+### Run it locally first
+
+```bash
+python -m tracker run-weekly --dry-run
+```
+
+Then push, add the secrets, and trigger *Weekly triage → Run workflow* once to confirm the commit and the email arrive. `data/scenarios.yaml` holds saved financing scenarios (name + rate) for the refi alert; thresholds live under `alerts:` in `config.yaml`.

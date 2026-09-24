@@ -9,3 +9,10 @@ node_modules/
 
 rentcastAPI.md
 
+token.json
+credentials.json
+*.egg-info/
+.pytest_cache/
+
+!data/tracker.sqlite
+
