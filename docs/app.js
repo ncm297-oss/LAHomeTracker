@@ -1,9 +1,15 @@
 /* Page glue: reads inputs, calls BuyRent, renders. State lives in the URL hash. */
 (function () {
   'use strict';
-  var BR = window.BuyRent;
+  var BR = window.BuyRent, AS = window.Assumptions;
   var $ = function (s) { return document.querySelector(s); };
   var inputs = Array.prototype.slice.call(document.querySelectorAll('#inputs [data-k]'));
+
+  AS.NEIGHBORHOODS.forEach(function (n) {
+    var o = document.createElement('option');
+    o.value = n.key; o.textContent = n.name + ' (' + n.city + ')';
+    $('#neighborhood').appendChild(o);
+  });
 
   // ---------- formatting ----------
   function money(n, opts) {
@@ -26,9 +32,30 @@
       if (el.tagName === 'SELECT') { p[k] = el.value; return; }
       var v = parseFloat(String(el.value).replace(/[^0-9.\-]/g, ''));
       if (isNaN(v)) return;
-      p[k] = t === 'pct' ? v / 100 : t === 'int' ? Math.round(v) : v;
+      // round so 9.3 / 100 doesn't leak 0.09300000000000001 into the URL
+      p[k] = t === 'pct' ? Math.round(v * 10000) / 1e6 : t === 'int' ? Math.round(v) : v;
     });
-    return BR.withDefaults(p);
+    p = BR.withDefaults(p);
+    var n = AS.byKey(p.neighborhood);
+    if (n) p.sellCostFn = function (price) { return AS.sellCost(n, price); };
+    return p;
+  }
+
+  // Neighborhood drives property tax and the selling-cost formula.
+  // setTax is only true on an explicit neighborhood change so a hand-edited rate survives re-renders.
+  function applyNeighborhood(p, setTax) {
+    var n = AS.byKey(p.neighborhood);
+    var sell = $('[data-k="sellClose"]');
+    sell.readOnly = !!n;
+    if (!n) { $('#nb-hint').textContent = ''; return p; }
+    if (setTax) p.propTaxRate = n.propTaxRate;
+    p.sellClose = AS.sellCost(n, p.price) / p.price; // shown for reference; the fn is what's used
+    sell.value = +(p.sellClose * 100).toFixed(2);
+    var risk = { low: 'low fire risk', mixed: 'fire risk varies by parcel', high: 'high fire risk' }[n.fireRisk];
+    $('#nb-hint').textContent = n.city + ': property tax ' + pct(n.propTaxRate, 2) + ' of purchase price; ' +
+      'selling cost ' + pct(p.sellClose, 2) + ' at this price; ' + risk + ', insurance typically ' +
+      money(n.insuranceBand[0], { short: true }) + '–' + money(n.insuranceBand[1], { short: true }) + '/yr.' + (n.note ? ' ' + n.note : '');
+    return p;
   }
 
   function writeParams(p) {
@@ -43,7 +70,10 @@
 
   function toHash(p) {
     var parts = [];
-    for (var k in BR.DEFAULTS) if (p[k] !== BR.DEFAULTS[k]) parts.push(k + '=' + encodeURIComponent(p[k]));
+    for (var k in BR.DEFAULTS) {
+      if (k === 'sellClose' && p.neighborhood) continue; // derived from the neighborhood
+      if (p[k] !== BR.DEFAULTS[k]) parts.push(k + '=' + encodeURIComponent(p[k]));
+    }
     return parts.length ? '#' + parts.join('&') : '';
   }
   function fromHash() {
@@ -52,7 +82,7 @@
       if (!kv) return;
       var i = kv.indexOf('='), k = kv.slice(0, i), v = decodeURIComponent(kv.slice(i + 1));
       if (!(k in BR.DEFAULTS)) return;
-      p[k] = k === 'oppTaxMode' ? v : parseFloat(v);
+      p[k] = typeof BR.DEFAULTS[k] === 'string' ? v : parseFloat(v);
     });
     return BR.withDefaults(p);
   }
@@ -113,14 +143,14 @@
       : p.oppTaxMode === 'deferred' ? 'pre-tax; gains taxed at ' + pct(BR.cgRate(p)) + ' on sale' : 'pre-tax';
     var lines = [
       '<b>Own costs ' + money(r.own) + '</b> = property tax ' + money(r.propTax) + ' (' + pct(p.propTaxRate, 2) + ' × assessed ' + money(r.assessed) +
-        ') + insurance ' + money(r.insurance) + ' + maintenance ' + money(r.maintenance) + ' (' + pct(p.maintRate) + ' × ' + money(r.valueStart) + ')' +
+        ') + insurance' + (p.earthquake ? ' incl. earthquake' : '') + ' ' + money(r.insurance) + ' + maintenance ' + money(r.maintenance) + ' (' + pct(p.maintRate) + ' × ' + money(r.valueStart) + ')' +
         (r.hoa ? ' + HOA ' + money(r.hoa) : ''),
       '<b>Rent ' + money(r.rent) + '</b> = ' + money(p.rent) + ' × 12 × (1 + ' + pct(p.rentGrowth) + ')^' + (r.year - 1),
       '<b>Renter portfolio ' + money(r.portEnd) + '</b> = ' + money(r.portStart) + ' + growth ' + money(r.portGrowth) + ' (' + taxMode + ') ' +
         (r.contribution >= 0 ? '+ saved ' + money(r.contribution) : '− drawn ' + money(-r.contribution)) + ' (own costs − rent)' +
         (p.oppTaxMode === 'deferred' ? ' → net of tax on gain: ' + money(r.renterNet) : ''),
       '<b>Home value ' + money(r.valueEnd) + '</b> = ' + money(r.valueStart) + ' × (1 + ' + pct(p.appreciation) + ')',
-      '<b>Owner net ' + money(r.ownerNet) + '</b> = proceeds ' + money(r.sale.proceeds) + ' (after ' + pct(p.sellClose) + ' selling costs) − tax ' + money(r.sale.tax) +
+      '<b>Owner net ' + money(r.ownerNet) + '</b> = proceeds ' + money(r.sale.proceeds) + ' (after ' + money(r.sale.sellCost) + ' selling costs, ' + pct(r.sale.sellCost / r.valueEnd, 2) + ') − tax ' + money(r.sale.tax) +
         ' on gain ' + money(r.sale.gain) + ' over basis ' + money(p.price * (1 + p.buyClose)) + ', less ' + money(p.cgExclusion) + ' exclusion',
       '<b>Difference ' + money(r.diff) + '</b> = owner net − renter net. Cumulative: rent paid ' + money(r.cumRent) + ', own costs paid ' + money(r.cumOwn) + '.'
     ];
@@ -139,6 +169,7 @@
     var p = readParams();
     if (p.years < 1) p.years = 1;
     if (p.years > 40) p.years = 40;
+    p = applyNeighborhood(p);
     var sim = BR.simulate(p);
     renderVerdict(p, sim);
     renderSensitivity(p);
@@ -153,6 +184,9 @@
     el.addEventListener('input', schedule);
     el.addEventListener('blur', function () { writeParams(readParams()); }); // re-format money fields
   });
+  // Changing neighborhood or price re-derives tax rate and sell cost into the visible fields.
+  $('#neighborhood').addEventListener('change', function () { writeParams(applyNeighborhood(readParams(), true)); render(); });
+  $('[data-k="price"]').addEventListener('change', function () { writeParams(applyNeighborhood(readParams())); render(); });
   document.querySelectorAll('[data-preset]').forEach(function (b) {
     b.addEventListener('click', function () {
       var p = readParams(), pr = BR.PRESETS[b.dataset.preset];
@@ -167,8 +201,13 @@
     var d = $('#yearly tr.detail[data-for="' + tr.dataset.y + '"]');
     d.hidden = !d.hidden;
   });
-  window.addEventListener('hashchange', function () { writeParams(fromHash()); render(); });
-
-  writeParams(fromHash());
-  render();
+  // A shared link with a neighborhood but no explicit tax rate takes the neighborhood's rate.
+  function loadFromHash() {
+    var p = fromHash();
+    writeParams(p);
+    if (p.neighborhood && !/(^|[#&])propTaxRate=/.test(location.hash)) writeParams(applyNeighborhood(p, true));
+    render();
+  }
+  window.addEventListener('hashchange', loadFromHash);
+  loadFromHash();
 })();

@@ -29,6 +29,10 @@
   <form id="inputs" autocomplete="off">
     <details open class="card">
       <summary>The deal</summary>
+      <label>Neighborhood
+        <select data-k="neighborhood" id="neighborhood"><option value="">Custom (enter tax and sell costs below)</option></select>
+      </label>
+      <p class="hint" id="nb-hint"></p>
       <label>Purchase price <span class="unit">$</span><input data-k="price" data-t="money" inputmode="numeric"></label>
       <label>Comparable rent <span class="unit">$/mo</span><input data-k="rent" data-t="money" inputmode="numeric"></label>
       <label>Hold period <span class="unit">years</span><input data-k="years" data-t="int" inputmode="numeric" min="1" max="40"></label>
@@ -58,14 +62,17 @@
       <summary>Ownership costs</summary>
       <label>Property tax <span class="unit">% of assessed</span><input data-k="propTaxRate" data-t="pct" inputmode="decimal" step="0.01"></label>
       <label>Assessed growth cap (Prop 13) <span class="unit">% / yr</span><input data-k="prop13Cap" data-t="pct" inputmode="decimal" step="0.1"></label>
-      <label>Insurance <span class="unit">$ / yr</span><input data-k="insurance" data-t="money" inputmode="numeric"></label>
-      <p class="hint">Fire-hazard-zone homes can run several times this, or be FAIR Plan only. Check before trusting the default.</p>
+      <label>Fire / homeowners insurance <span class="unit">$ / yr</span><input data-k="insurance" data-t="money" inputmode="numeric"></label>
+      <p class="hint" id="ins-hint">Non-brush Westside flats with a $1.2–1.8M rebuild: roughly $6–12K with a standard or high-net-worth carrier. Very High Fire Hazard Severity Zone parcels (Brentwood canyons, hillsides) often need FAIR Plan + a wrap policy at $8–25K+, and the FAIR Plan raised rates 29% in Oct 2026. Get a quote before trusting this number.</p>
+      <label>Earthquake insurance <span class="unit">$ / yr</span><input data-k="earthquake" data-t="money" inputmode="numeric"></label>
+      <p class="hint">Optional. CEA runs about $3.50 per $1,000 of dwelling coverage (≈$5K on a $1.5M rebuild), more for pre-1980 raised foundations.</p>
       <label>Maintenance <span class="unit">% of value / yr</span><input data-k="maintRate" data-t="pct" inputmode="decimal" step="0.1"></label>
       <label>HOA <span class="unit">$ / mo</span><input data-k="hoa" data-t="money" inputmode="numeric"></label>
       <div class="row2">
         <label>Buy closing costs <span class="unit">%</span><input data-k="buyClose" data-t="pct" inputmode="decimal" step="0.1"></label>
         <label>Sell costs <span class="unit">%</span><input data-k="sellClose" data-t="pct" inputmode="decimal" step="0.1"></label>
       </div>
+      <p class="hint" id="sell-hint">Commission (~5%) + escrow/title (~0.25%) + county transfer 0.11% + city transfer tax. Picking a neighborhood computes this per sale price, including LA's Measure ULA (4% at $5.4M+) and Santa Monica's Measure GS (5.6% at $8M+).</p>
     </details>
 
     <details class="card">
@@ -82,7 +89,12 @@
         <label>Federal LTCG <span class="unit">%</span><input data-k="ltcgFedRate" data-t="pct" inputmode="decimal" step="0.1"></label>
         <label>NIIT <span class="unit">%</span><input data-k="niitRate" data-t="pct" inputmode="decimal" step="0.1"></label>
       </div>
-      <p class="hint">California taxes gains as ordinary income at the marginal rate above. Federal LTCG steps to 20% above ~$600K taxable income for MFJ.</p>
+      <div class="row2">
+        <label>Federal LTCG above bracket <span class="unit">%</span><input data-k="ltcgHighRate" data-t="pct" inputmode="decimal" step="0.1"></label>
+        <label>Top of 15% bracket <span class="unit">$ taxable</span><input data-k="ltcgTop" data-t="money" inputmode="numeric"></label>
+      </div>
+      <label>Your ordinary taxable income <span class="unit">$</span><input data-k="ordinaryTaxable" data-t="money" inputmode="numeric"></label>
+      <p class="hint">Gains stack on top of ordinary income: the part that fits under the bracket top pays the lower rate, the rest pays the higher one. California taxes gains as ordinary income at the marginal rate above. NIIT applies to the whole gain.</p>
       <button type="button" id="reset" class="ghost">Reset to defaults</button>
     </details>
   </form>
@@ -105,7 +117,7 @@
       <li>Both of you start with the same cash: <b>price + buy closing costs</b>. The owner puts it into the house; the renter invests it at the expected return.</li>
       <li>Each year the owner pays property tax (on the Prop 13 assessed value, growing at most the cap and never above market), insurance, maintenance and HOA. The renter pays rent. Whoever pays less invests the difference into the renter's portfolio (a negative contribution means the owner was cheaper that year).</li>
       <li>Portfolio tax: <i>taxed at sale</i> compounds pre-tax and pays the combined long-term rate (federal LTCG + NIIT + CA) on the gain at the end; <i>taxed yearly</i> reduces the return by the federal marginal rate each year (Treasury interest is CA-exempt); <i>pre-tax</i> ignores tax.</li>
-      <li>At sale the owner nets <b>value × (1 − sell costs) − tax</b>, where tax applies to the gain over cost basis beyond the $500K exclusion.</li>
+      <li>At sale the owner nets <b>value − selling costs − tax</b>. Selling costs are commission, fees and transfer taxes (per city when a neighborhood is chosen). Tax applies to the gain over cost basis beyond the $500K exclusion, at 15%/20% federal by bracket + 3.8% NIIT + CA marginal.</li>
       <li><b>Wealth difference = owner net − renter net.</b> Breakeven price, appreciation and rent are found by solving for the input that makes the difference zero.</li>
     </ol>
     <p class="hint">Not modelled yet: mortgages, the SALT / mortgage-interest deduction, realising gains on portfolio withdrawals. Financing is Phase 1B.</p>
@@ -114,6 +126,7 @@
 
 <footer><small>Phase 1 · calculations in <code>calc.js</code> · nothing leaves your browser</small></footer>
 
+<script src="assumptions.js"></script>
 <script src="calc.js"></script>
 <script src="app.js"></script>
 </body>

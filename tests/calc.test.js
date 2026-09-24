@@ -28,12 +28,48 @@ test('assessed value falls with market value in a downturn (Prop 8)', () => {
 });
 
 test('sale applies selling costs, exclusion and combined LTCG rate', () => {
-  const p = BR.withDefaults({ price: 2000000 });
+  const p = BR.withDefaults({ price: 2000000, sellClose: 0.055 });
   const sale = BR.saleNet(p, 3000000);
   near(sale.proceeds, 2835000, 1e-6);           // 5.5% cost
   near(sale.gain, 2835000 - 2020000, 1e-6);     // basis includes 1% buy closing
   near(sale.taxable, 815000 - 500000, 1e-6);
   near(sale.tax, 315000 * (0.15 + 0.038 + 0.093), 1e-6);
+});
+
+test('federal LTCG steps to 20% once the gain fills the 15% bracket', () => {
+  const p = BR.withDefaults({ ltcgTop: 613700, ordinaryTaxable: 298000 }); // room = 315,700
+  near(BR.capitalGainsTax(p, 100000), 100000 * (0.15 + 0.038 + 0.093), 1e-6);
+  const big = BR.capitalGainsTax(p, 1000000);
+  near(big, 315700 * 0.15 + 684300 * 0.20 + 1000000 * (0.038 + 0.093), 1e-6);
+});
+
+test('neighborhood selling-cost function is used when supplied', () => {
+  const AS = require('../docs/assumptions.js');
+  const n = AS.byKey('west_la');
+  const base = { price: 2500000, sellCostFn: (v) => AS.sellCost(n, v) };
+  const p = BR.withDefaults(base);
+  assert.equal(typeof p.sellCostFn, 'function');
+  // 5% + 0.25% + 0.45% city + 0.11% county = 5.81%
+  near(BR.saleNet(p, 3000000).sellCost, 3000000 * 0.0581, 1e-6);
+  // Measure ULA kicks in at $5.4M on the whole price
+  near(AS.sellCost(n, 5400000), 5400000 * (0.0581 + 0.04), 1e-6);
+  near(AS.sellCost(n, 5399999), 5399999 * 0.0581, 1e-3);
+});
+
+test('city transfer taxes match published schedules', () => {
+  const AS = require('../docs/assumptions.js');
+  const sm = AS.byKey('santa_monica'), cc = AS.byKey('culver_city'), mdr = AS.byKey('marina_del_rey');
+  near(sm.transfer(2500000), 2500000 * (0.003 + 0.0011), 1e-6);
+  near(sm.transfer(5000000), 5000000 * (0.006 + 0.0011), 1e-6);
+  near(cc.transfer(2500000), 6750 + 1000000 * 0.015 + 2500000 * 0.0011, 1e-6);
+  near(mdr.transfer(2500000), 2500000 * 0.0011, 1e-6);
+  assert.equal(AS.NEIGHBORHOODS.length, 9);
+});
+
+test('earthquake premium is added to insurance and inflated', () => {
+  const s = BR.simulate({ insurance: 10000, earthquake: 5000, expenseInflation: 0.10, years: 2 });
+  near(s.rows[0].insurance, 15000, 1e-6);
+  near(s.rows[1].insurance, 16500, 1e-6);
 });
 
 test('no capital-gains tax when gain is inside the exclusion', () => {

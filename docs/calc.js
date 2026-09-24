@@ -19,12 +19,17 @@
  *   'deferred' - gains compound untaxed and are taxed once at the end at the
  *                long-term capital-gains rate (equities held for the hold)
  *
+ * Capital-gains tax on a realised gain = federal LTCG (15% up to the top of the
+ * 15% bracket after ordinary income, 20% above) + 3.8% NIIT + CA marginal rate.
+ *
+ * Selling cost: either a flat fraction (sellClose) or, when the page passes a
+ * neighborhood, sellCostFn(salePrice) from assumptions.js, which knows about
+ * city transfer taxes and the LA Measure ULA / Santa Monica GS thresholds.
+ *
  * Simplifications, on purpose:
  *   - Contributions land at year end; growth applies to the opening balance.
  *   - Deferred mode adjusts basis by each contribution, including negative
  *     ones, instead of realising gains on withdrawals.
- *   - Federal LTCG defaults to 15%; a very large gain on top of $330K of
- *     income can reach the 20% bracket. Editable.
  *   - No mortgage. Financing is Phase 1B.
  */
 (function (root) {
@@ -34,22 +39,27 @@
     price: 2500000,
     rent: 7000,              // monthly, comparable
     years: 7,
+    neighborhood: '',        // key from assumptions.js, or '' for custom
     oppRate: 0.07,           // pre-tax return on the cash if not spent on the house
     oppTaxMode: 'deferred',  // see header
     fedRate: 0.24,
     caRate: 0.093,
     ltcgFedRate: 0.15,
+    ltcgHighRate: 0.20,
+    ltcgTop: 613700,         // 2026 MFJ: taxable income above this pays 20% on LTCG
+    ordinaryTaxable: 298000, // ~$330K gross less the 2026 MFJ standard deduction
     niitRate: 0.038,
     propTaxRate: 0.012,
     prop13Cap: 0.02,
-    insurance: 10000,        // annual $
+    insurance: 10000,        // annual $, fire/standard policy
+    earthquake: 0,           // annual $, CEA or private EQ policy
     maintRate: 0.01,         // of current market value, per year
     hoa: 0,                  // monthly $
     buyClose: 0.01,
-    sellClose: 0.055,
+    sellClose: 0.058,        // 5% commission + 0.25% fees + LA City 0.45% + county 0.11%
     rentGrowth: 0.03,
     appreciation: 0.03,
-    expenseInflation: 0.03,  // applied to insurance and HOA
+    expenseInflation: 0.03,  // applied to insurance, earthquake and HOA
     cgExclusion: 500000
   };
 
@@ -62,13 +72,22 @@
     var out = {};
     for (var k in DEFAULTS) {
       var v = p ? p[k] : undefined;
-      var ok = k === 'oppTaxMode' ? typeof v === 'string' : typeof v === 'number' && !isNaN(v);
+      var ok = typeof v === typeof DEFAULTS[k] && (typeof v !== 'number' || !isNaN(v));
       out[k] = ok ? v : DEFAULTS[k];
     }
+    if (p && typeof p.sellCostFn === 'function') out.sellCostFn = p.sellCostFn;
     return out;
   }
 
-  // Combined rate applied to realised long-term gains (home sale, equity portfolio).
+  // Tax on a realised long-term gain, stacked on top of ordinary income.
+  function capitalGainsTax(p, gain) {
+    if (gain <= 0) return 0;
+    var room = Math.max(0, p.ltcgTop - p.ordinaryTaxable);
+    var low = Math.min(gain, room), high = gain - low;
+    return low * p.ltcgFedRate + high * p.ltcgHighRate + gain * (p.niitRate + p.caRate);
+  }
+
+  // Marginal combined rate on the first dollar of gain; used for display only.
   function cgRate(p) {
     return p.ltcgFedRate + p.niitRate + p.caRate;
   }
@@ -81,16 +100,21 @@
 
   function portfolioNet(p, value, basis) {
     if (p.oppTaxMode !== 'deferred') return value;
-    return value - Math.max(0, value - basis) * cgRate(p);
+    return value - capitalGainsTax(p, value - basis);
+  }
+
+  function sellingCost(p, value) {
+    return p.sellCostFn ? p.sellCostFn(value) : value * p.sellClose;
   }
 
   function saleNet(p, value) {
-    var proceeds = value * (1 - p.sellClose);
+    var cost = sellingCost(p, value);
+    var proceeds = value - cost;
     var costBasis = p.price * (1 + p.buyClose);
     var gain = proceeds - costBasis;
     var taxable = Math.max(0, gain - p.cgExclusion);
-    var tax = taxable * cgRate(p);
-    return { proceeds: proceeds, gain: gain, taxable: taxable, tax: tax, net: proceeds - tax };
+    var tax = capitalGainsTax(p, taxable);
+    return { sellCost: cost, proceeds: proceeds, gain: gain, taxable: taxable, tax: tax, net: proceeds - tax };
   }
 
   function simulate(input) {
@@ -107,7 +131,7 @@
       var infl = Math.pow(1 + p.expenseInflation, y - 1);
       var rentY = p.rent * 12 * Math.pow(1 + p.rentGrowth, y - 1);
       var propTax = assessed * p.propTaxRate;
-      var ins = p.insurance * infl;
+      var ins = (p.insurance + p.earthquake) * infl;
       var maint = value * p.maintRate;
       var hoaY = p.hoa * 12 * infl;
       var own = propTax + ins + maint + hoaY;
@@ -231,6 +255,7 @@
   var api = {
     DEFAULTS: DEFAULTS, PRESETS: PRESETS,
     withDefaults: withDefaults, simulate: simulate, saleNet: saleNet, cgRate: cgRate,
+    capitalGainsTax: capitalGainsTax, sellingCost: sellingCost,
     portfolioGrowth: portfolioGrowth, breakevenPrice: breakevenPrice,
     breakevenAppreciation: breakevenAppreciation, rentEquivalent: rentEquivalent,
     breakevenYear: breakevenYear, sensitivity: sensitivity, solve: solve
