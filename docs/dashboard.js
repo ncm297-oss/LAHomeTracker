@@ -107,6 +107,7 @@
         (l.est_rent || raw.est_rent_used) ? 'est. rent ' + money(l.est_rent || raw.est_rent_used) + '/mo' + (raw.rent_source && raw.rent_source !== 'avm' ? ' (' + raw.rent_source + ')' : '') : '',
         l.breakeven_price ? 'breakeven ' + money(l.breakeven_price, true) : ''
       ].filter(Boolean).map(esc).join(' · ') + '</div>' +
+      (raw.rent_equivalent ? '<div class="facts"><b>vs your rent:</b> owning this ≈ renting at ' + money(raw.rent_equivalent) + '/mo → <b class="' + (raw.premium_vs_target > 0 ? 'neg' : 'pos') + '">' + (raw.premium_vs_target > 0 ? '+' : '') + money(raw.premium_vs_target) + '/mo</b> over a ' + money((data.meta.rent_band[0] + data.meta.rent_band[1]) / 2) + ' rental</div>' : '') +
       '<div class="bars">' + bar('$/sqft vs comps', c.ppsf) + bar('Price cuts', c.cuts) + bar('Days on market', c.dom) + bar('Below last sale', c.below_last_sale) + bar('Rent yield', c.yield) + bar('Breakeven', c.breakeven) + '</div>' +
       (hist ? '<div class="hint">Price history: ' + hist + '</div>' : '') +
       '<div class="flags">' + (flagged.length ? '<span class="tag bad">' + flagged.map(esc).join(', ') + '</span> ' : '') +

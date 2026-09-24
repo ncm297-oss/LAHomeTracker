@@ -120,6 +120,7 @@ input[type="range"] { padding: 0; accent-color: var(--accent); }
 .listing small { color: var(--muted); font-weight: 400; font-size: .75rem; }
 .listing .body { padding: 8px 0 4px 46px; font-size: .85rem; }
 .listing .facts { color: var(--muted); font-size: .8rem; margin: 4px 0 8px; }
+.listing .facts b.pos { color: var(--good); } .listing .facts b.neg { color: var(--bad); }
 .bars { display: grid; grid-template-columns: 1fr 1fr; gap: 4px 14px; margin: 6px 0; }
 .bar { position: relative; display: grid; grid-template-columns: 110px 1fr 28px; align-items: center; gap: 6px; font-size: .75rem; color: var(--muted); }
 .bar b { display: block; height: 8px; background: var(--accent); border-radius: 4px; }

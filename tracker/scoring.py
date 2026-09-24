@@ -165,6 +165,21 @@ def score_listing(listing: dict, history: list[dict], comps: dict, cfg: dict, nb
     else:
         comp["breakeven"] = None
 
+    # Not scored, but shown: the monthly rent at which buying THIS house ties renting, and how far
+    # that sits above your actual rent band. The premium is what the nicer home costs you per month.
+    if price:
+        p_eq = buyrent.from_config(
+            cfg["buyrent"], price=price,
+            prop_tax_rate=(nb_cfg or {}).get("prop_tax_rate", 0.012),
+            insurance=(nb_cfg or {}).get("insurance", 10_000),
+            hoa=listing.get("hoa") or 0,
+        )
+        req = buyrent.rent_equivalent(p_eq)
+        if req:
+            target = sum(cfg["rent_band"]) / 2
+            raw["rent_equivalent"] = round(req)
+            raw["premium_vs_target"] = round(req - target)
+
     avail = {k: v for k, v in comp.items() if v is not None}
     total_w = sum(w[k] for k in avail)
     score = sum(w[k] * v for k, v in avail.items()) / total_w if total_w else 0.0
@@ -187,6 +202,8 @@ def verdict(listing: dict, s: dict, cfg: dict) -> str:
     if "gross_yield" in raw:
         src = "" if raw.get("rent_source") == "avm" else f" ({raw.get('rent_source')})"
         bits.append(f"{raw['gross_yield']*100:.1f}% gross yield{src}" + (" ⚑" if raw.get("yield_flag") else ""))
+    if "rent_equivalent" in raw:
+        bits.append(f"owning ≈ renting at ${raw['rent_equivalent']/1e3:.1f}K/mo, {raw['premium_vs_target']/1e3:+.1f}K vs your ${sum(cfg['rent_band'])/2/1e3:.0f}K target")
     return "; ".join(bits) if bits else "insufficient data"
 
 
