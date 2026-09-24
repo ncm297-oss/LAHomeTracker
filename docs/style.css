@@ -1,0 +1,85 @@
+:root {
+  --bg: #f6f5f2;
+  --card: #ffffff;
+  --text: #1c1c1a;
+  --muted: #6b6b66;
+  --line: #e2e0da;
+  --accent: #1f5f8b;
+  --good: #1e7d4f;
+  --bad: #b3261e;
+  --good-bg: #e6f4ec;
+  --bad-bg: #fbe9e7;
+  color-scheme: light dark;
+}
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #15161a; --card: #1f2126; --text: #ecebe6; --muted: #9a9a94; --line: #34363d;
+    --accent: #7db6dd; --good: #6fcf97; --bad: #f28b82; --good-bg: #1d3328; --bad-bg: #3a2320;
+  }
+}
+* { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; }
+body {
+  margin: 0; background: var(--bg); color: var(--text);
+  font: 16px/1.4 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+header, main, footer { max-width: 760px; margin: 0 auto; padding: 0 16px; }
+header { padding-top: 20px; }
+h1 { font-size: 1.6rem; margin: 0 0 4px; }
+h2 { font-size: 1.05rem; margin: 0 0 8px; }
+.sub { color: var(--muted); margin: 0 0 12px; font-size: .9rem; }
+footer { color: var(--muted); padding: 16px; text-align: center; }
+
+.card {
+  background: var(--card); border: 1px solid var(--line); border-radius: 12px;
+  padding: 14px 16px; margin: 12px 0;
+}
+details.card > summary { cursor: pointer; font-weight: 600; list-style: none; padding: 2px 0; }
+details.card > summary::-webkit-details-marker { display: none; }
+details.card > summary::after { content: "+"; float: right; color: var(--muted); }
+details[open].card > summary::after { content: "–"; }
+details.card > summary + * { margin-top: 10px; }
+
+label { display: block; margin: 10px 0 0; font-size: .92rem; }
+label .unit { color: var(--muted); font-size: .8rem; margin-left: 4px; }
+input, select {
+  display: block; width: 100%; margin-top: 4px; padding: 10px 12px; font-size: 1.05rem;
+  border: 1px solid var(--line); border-radius: 8px; background: var(--bg); color: var(--text);
+}
+input:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 0; }
+.row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.hint { color: var(--muted); font-size: .82rem; margin: 6px 0 0; }
+.presets { display: flex; gap: 8px; flex-wrap: wrap; }
+.presets button, .ghost {
+  padding: 8px 12px; border-radius: 999px; border: 1px solid var(--line); background: var(--bg);
+  color: var(--text); font-size: .85rem; cursor: pointer;
+}
+.presets button.active { border-color: var(--accent); color: var(--accent); font-weight: 600; }
+.ghost { margin-top: 12px; }
+
+.verdict .big { font-size: 2rem; font-weight: 700; letter-spacing: -.02em; line-height: 1.1; }
+.verdict.good { background: var(--good-bg); } .verdict.good .big { color: var(--good); }
+.verdict.bad { background: var(--bad-bg); } .verdict.bad .big { color: var(--bad); }
+.verdict .label { color: var(--muted); font-size: .85rem; }
+.metrics { display: grid; grid-template-columns: 1fr 1fr; gap: 8px 12px; margin-top: 12px; }
+.metrics .k { display: block; color: var(--muted); font-size: .75rem; }
+.metrics .v { display: block; font-weight: 600; font-size: 1.05rem; }
+.metrics small { display: block; font-size: .75rem; font-weight: 400; color: var(--muted); }
+.note { font-size: .82rem; margin: 10px 0 0; color: var(--muted); }
+
+.scroll { overflow-x: auto; -webkit-overflow-scrolling: touch; }
+table { border-collapse: collapse; width: 100%; font-size: .85rem; white-space: nowrap; }
+th, td { padding: 6px 8px; text-align: right; border-bottom: 1px solid var(--line); }
+th:first-child, td:first-child { text-align: left; }
+thead th { color: var(--muted); font-weight: 600; font-size: .75rem; }
+td.pos { color: var(--good); font-weight: 600; }
+td.neg { color: var(--bad); font-weight: 600; }
+#sens td.cell { background: color-mix(in srgb, var(--card) 100%, transparent); }
+#yearly tbody tr.y { cursor: pointer; }
+#yearly tbody tr.y:hover { background: var(--bg); }
+tr.detail td { text-align: left; background: var(--bg); font-size: .8rem; color: var(--muted); padding: 0; }
+tr.detail td > div { position: sticky; left: 0; width: min(100%, calc(100vw - 66px)); max-width: 726px; white-space: normal; padding: 8px; }
+tr.detail td b { color: var(--text); }
+.how ol { padding-left: 20px; margin: 0; font-size: .9rem; }
+.how li { margin-bottom: 6px; }
+code { font-size: .85em; }

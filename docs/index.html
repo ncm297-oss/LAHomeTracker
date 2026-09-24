@@ -1,0 +1,120 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Buy vs Rent — West LA</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>Buy vs Rent</h1>
+  <p class="sub">At what price does this house beat renting? Settings are saved in the link — share the URL.</p>
+</header>
+
+<main>
+  <section id="verdict" class="card verdict" aria-live="polite">
+    <div class="big" id="v-diff">—</div>
+    <div class="label" id="v-diff-label">net wealth difference after the hold</div>
+    <div class="metrics">
+      <div><span class="k">Breakeven price</span><span class="v" id="v-be-price">—</span></div>
+      <div><span class="k">Breakeven appreciation</span><span class="v" id="v-be-appr">—</span></div>
+      <div><span class="k">Rent that ties this price</span><span class="v" id="v-rent-eq">—</span></div>
+      <div><span class="k">Year 1 cost to own</span><span class="v" id="v-monthly">—</span></div>
+    </div>
+    <p class="note" id="v-note"></p>
+  </section>
+
+  <form id="inputs" autocomplete="off">
+    <details open class="card">
+      <summary>The deal</summary>
+      <label>Purchase price <span class="unit">$</span><input data-k="price" data-t="money" inputmode="numeric"></label>
+      <label>Comparable rent <span class="unit">$/mo</span><input data-k="rent" data-t="money" inputmode="numeric"></label>
+      <label>Hold period <span class="unit">years</span><input data-k="years" data-t="int" inputmode="numeric" min="1" max="40"></label>
+    </details>
+
+    <details open class="card">
+      <summary>Your cash if you don't buy</summary>
+      <div class="presets" role="group" aria-label="Where the cash sits">
+        <button type="button" data-preset="equities">Equities (7%, taxed at sale)</button>
+        <button type="button" data-preset="treasuries">Treasuries (4.5%, taxed yearly)</button>
+      </div>
+      <label>Expected return <span class="unit">% / yr pre-tax</span><input data-k="oppRate" data-t="pct" inputmode="decimal" step="0.1"></label>
+      <label>Tax on that return
+        <select data-k="oppTaxMode">
+          <option value="deferred">After-tax: gains taxed once at sale (equities)</option>
+          <option value="annual">After-tax: taxed every year, federal only (Treasuries)</option>
+          <option value="pretax">Pre-tax: ignore taxes on returns</option>
+        </select>
+      </label>
+      <div class="row2">
+        <label>Federal marginal <span class="unit">%</span><input data-k="fedRate" data-t="pct" inputmode="decimal" step="0.1"></label>
+        <label>California marginal <span class="unit">%</span><input data-k="caRate" data-t="pct" inputmode="decimal" step="0.1"></label>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary>Ownership costs</summary>
+      <label>Property tax <span class="unit">% of assessed</span><input data-k="propTaxRate" data-t="pct" inputmode="decimal" step="0.01"></label>
+      <label>Assessed growth cap (Prop 13) <span class="unit">% / yr</span><input data-k="prop13Cap" data-t="pct" inputmode="decimal" step="0.1"></label>
+      <label>Insurance <span class="unit">$ / yr</span><input data-k="insurance" data-t="money" inputmode="numeric"></label>
+      <p class="hint">Fire-hazard-zone homes can run several times this, or be FAIR Plan only. Check before trusting the default.</p>
+      <label>Maintenance <span class="unit">% of value / yr</span><input data-k="maintRate" data-t="pct" inputmode="decimal" step="0.1"></label>
+      <label>HOA <span class="unit">$ / mo</span><input data-k="hoa" data-t="money" inputmode="numeric"></label>
+      <div class="row2">
+        <label>Buy closing costs <span class="unit">%</span><input data-k="buyClose" data-t="pct" inputmode="decimal" step="0.1"></label>
+        <label>Sell costs <span class="unit">%</span><input data-k="sellClose" data-t="pct" inputmode="decimal" step="0.1"></label>
+      </div>
+    </details>
+
+    <details class="card">
+      <summary>Growth assumptions</summary>
+      <label>Home appreciation <span class="unit">% / yr</span><input data-k="appreciation" data-t="pct" inputmode="decimal" step="0.1"></label>
+      <label>Rent growth <span class="unit">% / yr</span><input data-k="rentGrowth" data-t="pct" inputmode="decimal" step="0.1"></label>
+      <label>Insurance &amp; HOA inflation <span class="unit">% / yr</span><input data-k="expenseInflation" data-t="pct" inputmode="decimal" step="0.1"></label>
+    </details>
+
+    <details class="card">
+      <summary>Taxes on sale</summary>
+      <label>Capital-gains exclusion (MFJ) <span class="unit">$</span><input data-k="cgExclusion" data-t="money" inputmode="numeric"></label>
+      <div class="row2">
+        <label>Federal LTCG <span class="unit">%</span><input data-k="ltcgFedRate" data-t="pct" inputmode="decimal" step="0.1"></label>
+        <label>NIIT <span class="unit">%</span><input data-k="niitRate" data-t="pct" inputmode="decimal" step="0.1"></label>
+      </div>
+      <p class="hint">California taxes gains as ordinary income at the marginal rate above. Federal LTCG steps to 20% above ~$600K taxable income for MFJ.</p>
+      <button type="button" id="reset" class="ghost">Reset to defaults</button>
+    </details>
+  </form>
+
+  <section class="card">
+    <h2>Sensitivity: wealth difference by appreciation and hold</h2>
+    <p class="hint">Positive = buying wins. Rent and all other inputs as entered.</p>
+    <div class="scroll"><table id="sens"></table></div>
+  </section>
+
+  <section class="card">
+    <h2>Year by year</h2>
+    <p class="hint">"If sold" columns assume you sell at the end of that year. Tap a row for the math.</p>
+    <div class="scroll"><table id="yearly"></table></div>
+  </section>
+
+  <section class="card how">
+    <h2>How the math works</h2>
+    <ol>
+      <li>Both of you start with the same cash: <b>price + buy closing costs</b>. The owner puts it into the house; the renter invests it at the expected return.</li>
+      <li>Each year the owner pays property tax (on the Prop 13 assessed value, growing at most the cap and never above market), insurance, maintenance and HOA. The renter pays rent. Whoever pays less invests the difference into the renter's portfolio (a negative contribution means the owner was cheaper that year).</li>
+      <li>Portfolio tax: <i>taxed at sale</i> compounds pre-tax and pays the combined long-term rate (federal LTCG + NIIT + CA) on the gain at the end; <i>taxed yearly</i> reduces the return by the federal marginal rate each year (Treasury interest is CA-exempt); <i>pre-tax</i> ignores tax.</li>
+      <li>At sale the owner nets <b>value × (1 − sell costs) − tax</b>, where tax applies to the gain over cost basis beyond the $500K exclusion.</li>
+      <li><b>Wealth difference = owner net − renter net.</b> Breakeven price, appreciation and rent are found by solving for the input that makes the difference zero.</li>
+    </ol>
+    <p class="hint">Not modelled yet: mortgages, the SALT / mortgage-interest deduction, realising gains on portfolio withdrawals. Financing is Phase 1B.</p>
+  </section>
+</main>
+
+<footer><small>Phase 1 · calculations in <code>calc.js</code> · nothing leaves your browser</small></footer>
+
+<script src="calc.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
