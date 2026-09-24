@@ -112,7 +112,9 @@ python -m tracker status                       # request counts per source (for 
 
 ### Scoring (0–100)
 
-Weighted mean of the components that have data (weights in `config.yaml`): $/sqft vs sold-comp median in the neighborhood (falls back to RentCast zip medians), cumulative price cut and number of cuts, days on market vs neighborhood median, asking below the seller's last purchase price, gross rent yield (flag ≥ 4%), and the Phase 1 breakeven price vs asking (same math as the page, ported to `tracker/buyrent.py` with a parity test). Rent yield and breakeven need a rent estimate, which comes from RentCast's AVM or a manual `--override est_rent=`.
+Weighted mean of the components that have data (weights in `config.yaml`): $/sqft vs sold-comp median in the neighborhood (falls back to RentCast zip medians), cumulative price cut and number of cuts, days on market vs neighborhood median, asking below the seller's last purchase price, gross rent yield (flag ≥ 4%), and the Phase 1 breakeven price vs asking (same math as the page, ported to `tracker/buyrent.py` with a parity test). Rent yield and breakeven need a rent estimate. Three tiers, cheapest first: (1) RentCast `/markets` zip medians — one request per zip per month (14 total), cached 30 days, giving every house/condo an estimate from the zip's median rent for its bedroom count scaled by √(sqft ratio); (2) RentCast AVM via `enrich` — one request per listing, spent top-score-first and capped by `monthly_budget`; (3) a manual `--override est_rent=`. Multi-family gets no zip fallback (building sqft × apartment rent/sf overstates income) and is hidden from the digest and the default dashboard view. The verdict says which tier was used.
+
+**Request budget.** RentCast counts successful calls only; the free tier is 50/month. The adapter refuses to call once the month's count reaches `monthly_budget`, and disables itself for the rest of a run after any 401/403/429, so a bad key can't burn the quota. `python -m tracker status` shows the count.
 
 ### Dashboard
 

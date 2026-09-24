@@ -41,6 +41,21 @@ def normalize_address(address: str, zip_code: str | None = None) -> str:
     return a.strip()
 
 
+def type_group(property_type: str | None) -> str:
+    """Collapse source-specific property types into sfr / condo / multi / other so $/sqft and
+    rent/sqft are compared like with like (a duplex at $400/sf is not a cheap house)."""
+    t = (property_type or "").lower()
+    if not t:
+        return "other"
+    if "multi" in t or "duplex" in t or "triplex" in t or "units" in t or "income" in t:
+        return "multi"
+    if "condo" in t or "town" in t or "co-op" in t or "coop" in t or "apartment" in t:
+        return "condo"
+    if "single" in t or "sfr" in t or "house" in t:
+        return "sfr"
+    return "other"
+
+
 def parse_money(s) -> float | None:
     if s is None:
         return None

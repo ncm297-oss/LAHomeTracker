@@ -96,8 +96,8 @@ sources:
     enabled: true
     base_url: https://api.rentcast.io/v1
     listing_limit: 500
-    rent_estimates: true          # one AVM call per new listing (costs requests)
-    monthly_budget: 50            # warn in the digest when the month's count passes this
+    rent_estimates: true          # per-listing AVM (1 request each); only used by `enrich`, top-scored first
+    monthly_budget: 50            # free tier; enrich stops at this count, digest warns when exceeded
   homeharvest:
     enabled: true                 # fallback for listings; main source for sold comps
     past_days_sold: 270
@@ -115,4 +115,5 @@ sources:
 
 digest:
   max_listings: 15
+  include_multi_family: false     # you're buying a home, not a building; flip if house-hacking
   subject_prefix: "[LA Tracker]"

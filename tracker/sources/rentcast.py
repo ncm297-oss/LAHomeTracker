@@ -15,6 +15,7 @@ from datetime import date
 
 from ..config import secret, neighborhood_for
 from ..models import Listing, PricePoint
+from ..normalize import type_group
 from .base import SourceAdapter, SourceError
 
 log = logging.getLogger("tracker")
@@ -41,6 +42,12 @@ class RentCast(SourceAdapter):
             raise SourceError("RENTCAST_API_KEY not set")
         if self._dead:
             raise SourceError(f"rentcast disabled for this run: {self._dead}")
+        budget = self.scfg.get("monthly_budget")
+        if budget:
+            used = self.db.request_counts(since=date.today().replace(day=1).isoformat()).get("rentcast", 0)
+            if used >= budget:
+                self._dead = f"monthly budget reached ({used}/{budget})"
+                raise SourceError(f"rentcast: {self._dead}")
         try:
             return self.cached_get(f"{self.base}{path}", params=params,
                                    headers={"X-Api-Key": self.key, "Accept": "application/json"},
@@ -137,12 +144,16 @@ class RentCast(SourceAdapter):
 
     # ---- market stats (comp fallback) ----
     def fetch_market(self, neighborhood: str) -> dict:
-        """Median $/sqft and DOM for the neighborhood's zips; stored as series with geo=neighborhood."""
+        """One request per zip (cached 30 days) gives sale medians AND rent medians by property
+        type / bedrooms. Stored as series with geo=zip, plus neighborhood averages with
+        geo=neighborhood. This is what lets every listing get a rent estimate without an AVM call."""
         nb = self.cfg["neighborhoods"][neighborhood]
         ppsf, dom, prices = [], [], []
         for z in nb["zips"]:
-            data = self._get("/markets", {"zipCode": z, "dataType": "Sale", "historyRange": 6}, ttl_hours=24 * 7, endpoint="markets")
+            data = self._get("/markets", {"zipCode": z, "dataType": "All", "historyRange": 6}, ttl_hours=24 * 30, endpoint="markets")
             sale = (data or {}).get("saleData") or {}
+            rent = (data or {}).get("rentalData") or {}
+            asof = (sale.get("lastUpdatedDate") or rent.get("lastUpdatedDate") or date.today().isoformat())[:10]
             if sale.get("medianPricePerSquareFoot"):
                 ppsf.append(sale["medianPricePerSquareFoot"])
             if sale.get("medianDaysOnMarket"):
@@ -153,6 +164,27 @@ class RentCast(SourceAdapter):
                 d = (h.get("date") or "")[:10]
                 if d and h.get("medianPricePerSquareFoot"):
                     self.db.put_series("rentcast_median_ppsf", [(d, h["medianPricePerSquareFoot"])], geo=z)
+            for t in sale.get("dataByPropertyType") or []:
+                if t.get("medianPricePerSquareFoot"):
+                    self.db.put_series(f"rentcast_median_ppsf_{type_group(t.get('propertyType'))}", [(asof, t["medianPricePerSquareFoot"])], geo=z)
+            # rents
+            if rent.get("medianRentPerSquareFoot"):
+                self.db.put_series("rentcast_rent_psf", [(asof, rent["medianRentPerSquareFoot"])], geo=z)
+            if rent.get("medianRent"):
+                self.db.put_series("rentcast_rent_median", [(asof, rent["medianRent"])], geo=z)
+            for t in rent.get("dataByPropertyType") or []:
+                if t.get("medianRentPerSquareFoot"):
+                    self.db.put_series(f"rentcast_rent_psf_{type_group(t.get('propertyType'))}", [(asof, t["medianRentPerSquareFoot"])], geo=z)
+            for b in rent.get("dataByBedrooms") or []:
+                if b.get("medianRent") and b.get("bedrooms") is not None:
+                    n = int(b["bedrooms"])
+                    self.db.put_series(f"rentcast_rent_bd{n}", [(asof, b["medianRent"])], geo=z)
+                    if b.get("medianSquareFootage"):
+                        self.db.put_series(f"rentcast_rent_sqft_bd{n}", [(asof, b["medianSquareFootage"])], geo=z)
+            for h in (rent.get("history") or {}).values():
+                d = (h.get("date") or "")[:10]
+                if d and h.get("medianRent"):
+                    self.db.put_series("rentcast_rent_median", [(d, h["medianRent"])], geo=z)
         today = date.today().isoformat()
         out = {}
         if ppsf:

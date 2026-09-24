@@ -98,12 +98,13 @@
       '</summary><div class="body">' +
       '<div class="verdict-line">' + esc(l.verdict || 'not scored yet') + '</div>' +
       '<div class="facts">' + [
+        l.property_type ? String(l.property_type).replace(/_/g, ' ').toLowerCase() : '',
         l.beds ? l.beds + ' bd' : '', l.baths ? l.baths + ' ba' : '', l.sqft ? Math.round(l.sqft).toLocaleString() + ' sf' : '',
         l.lot_sqft ? Math.round(l.lot_sqft).toLocaleString() + ' sf lot' : '', l.year_built ? 'built ' + l.year_built : '',
         l.days_on_market !== null && l.days_on_market !== undefined ? l.days_on_market + ' DOM' : '',
         l.hoa ? 'HOA ' + money(l.hoa) + '/mo' : '',
         l.last_sale_price ? 'last sold ' + money(l.last_sale_price, true) + (l.last_sale_date ? ' ' + esc(l.last_sale_date.slice(0, 4)) : '') : '',
-        l.est_rent ? 'est. rent ' + money(l.est_rent) + '/mo' : '',
+        (l.est_rent || raw.est_rent_used) ? 'est. rent ' + money(l.est_rent || raw.est_rent_used) + '/mo' + (raw.rent_source && raw.rent_source !== 'avm' ? ' (' + raw.rent_source + ')' : '') : '',
         l.breakeven_price ? 'breakeven ' + money(l.breakeven_price, true) : ''
       ].filter(Boolean).map(esc).join(' · ') + '</div>' +
       '<div class="bars">' + bar('$/sqft vs comps', c.ppsf) + bar('Price cuts', c.cuts) + bar('Days on market', c.dom) + bar('Below last sale', c.below_last_sale) + bar('Rent yield', c.yield) + bar('Breakeven', c.breakeven) + '</div>' +
@@ -117,10 +118,21 @@
       '</div></details>';
   }
 
+  function typeGroup(t) {
+    t = String(t || '').toLowerCase();
+    if (!t) return 'other';
+    if (/multi|duplex|triplex|units|income/.test(t)) return 'multi';
+    if (/condo|town|co-op|coop|apartment/.test(t)) return 'condo';
+    if (/single|sfr|house/.test(t)) return 'sfr';
+    return 'other';
+  }
+
   function renderListings() {
-    var nb = $('#f-nb').value, minScore = parseFloat($('#f-score').value) || 0, status = $('#f-status').value, sort = $('#f-sort').value;
+    var nb = $('#f-nb').value, minScore = parseFloat($('#f-score').value) || 0, status = $('#f-status').value, sort = $('#f-sort').value, type = $('#f-type').value;
     var rows = (data.listings || []).filter(function (l) {
-      return (!nb || l.neighborhood === nb) && (l.score || 0) >= minScore && (!status || l.status === status);
+      var g = typeGroup(l.property_type);
+      var typeOk = !type || (type === 'home' ? g !== 'multi' : g === type);
+      return typeOk && (!nb || l.neighborhood === nb) && (l.score || 0) >= minScore && (!status || l.status === status);
     });
     var key = { score: function (l) { return -(l.score || 0); }, price: function (l) { return l.list_price || 0; },
       ppsf: function (l) { return l.sqft ? l.list_price / l.sqft : 1e9; }, dom: function (l) { return -(l.days_on_market || 0); },
@@ -147,7 +159,7 @@
     Object.keys(data.meta.neighborhoods).forEach(function (k) {
       var o = document.createElement('option'); o.value = k; o.textContent = data.meta.neighborhoods[k].name; sel.appendChild(o);
     });
-    ['#f-nb', '#f-score', '#f-status', '#f-sort'].forEach(function (s) { $(s).addEventListener('input', renderListings); });
+    ['#f-nb', '#f-score', '#f-status', '#f-sort', '#f-type'].forEach(function (s) { $(s).addEventListener('input', renderListings); });
     renderAlerts(); renderMarket(); renderListings(); renderMeta();
   }
 

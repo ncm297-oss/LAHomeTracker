@@ -8,25 +8,47 @@ from statistics import median
 
 from . import buyrent
 from .db import DB
+from .normalize import type_group
 
 
 def clamp(x: float, lo: float = 0, hi: float = 100) -> float:
     return max(lo, min(hi, x))
 
 
-def type_group(property_type: str | None) -> str:
-    """Collapse source-specific property types into sfr / condo / multi / other so $/sqft is
-    compared like with like (a duplex at $400/sf is not a cheap house)."""
-    t = (property_type or "").lower()
-    if not t:
-        return "other"
-    if "multi" in t or "duplex" in t or "triplex" in t or "units" in t or "income" in t:
-        return "multi"
-    if "condo" in t or "town" in t or "co-op" in t or "coop" in t or "apartment" in t:
-        return "condo"
-    if "single" in t or "sfr" in t or "house" in t:
-        return "sfr"
-    return "other"
+def estimate_rent(db: DB, listing: dict) -> tuple[float | None, str | None]:
+    """Zip-level fallback when there is no per-listing AVM (RentCast /markets medians, one
+    request per zip per month). Houses and condos: the zip's median rent for that bedroom
+    count, scaled by sqrt(sqft / median sqft of those rentals) because rent per square foot
+    falls as homes get bigger. Multi-family gets no fallback."""
+    z = listing.get("zip_code")
+    if not z:
+        return None, None
+    grp = type_group(listing.get("property_type"))
+    sqft = listing.get("sqft")
+    beds = listing.get("beds")
+
+    def latest(name):
+        s = db.series(name, geo=z, limit=1)
+        return s[-1]["value"] if s and s[-1]["value"] else None
+
+    if grp == "multi":
+        # Gross building sqft x apartment rent/sf overstates income badly; needs an AVM or a manual override.
+        return None, None
+    if beds is not None:
+        n = min(int(beds), 5)
+        while n >= 0:
+            med = latest(f"rentcast_rent_bd{n}")
+            if med:
+                med_sqft = latest(f"rentcast_rent_sqft_bd{n}")
+                scale = (sqft / med_sqft) ** 0.5 if sqft and med_sqft else 1.0
+                scale = max(0.7, min(1.6, scale))
+                return round(med * scale), f"zip {n}-bed median"
+            n -= 1
+    if sqft:
+        psf = latest(f"rentcast_rent_psf_{grp}") or latest("rentcast_rent_psf")
+        if psf:
+            return round(psf * min(sqft, 2500)), "zip rent/sf"
+    return None, None
 
 
 def comp_stats(db: DB, neighborhood: str, window_months: int, min_count: int, group: str = "other") -> dict:
@@ -115,6 +137,8 @@ def score_listing(listing: dict, history: list[dict], comps: dict, cfg: dict, nb
     rent = listing.get("est_rent")
     if price and rent:
         y = rent * 12 / price
+        raw["est_rent_used"] = rent
+        raw["rent_source"] = listing.get("rent_source") or "avm"
         raw["gross_yield"] = y
         raw["yield_flag"] = y >= cfg["scoring"]["yield_flag"]
         comp["yield"] = clamp((y - 0.025) / 0.02 * 100)
@@ -161,7 +185,8 @@ def verdict(listing: dict, s: dict, cfg: dict) -> str:
     if raw.get("vs_last_sale") is not None and raw["vs_last_sale"] < 0:
         bits.append(f"{-raw['vs_last_sale']*100:.0f}% under seller's purchase")
     if "gross_yield" in raw:
-        bits.append(f"{raw['gross_yield']*100:.1f}% gross yield" + (" ⚑" if raw.get("yield_flag") else ""))
+        src = "" if raw.get("rent_source") == "avm" else f" ({raw.get('rent_source')})"
+        bits.append(f"{raw['gross_yield']*100:.1f}% gross yield{src}" + (" ⚑" if raw.get("yield_flag") else ""))
     return "; ".join(bits) if bits else "insufficient data"
 
 
@@ -186,6 +211,11 @@ def score_all(db: DB, cfg: dict) -> list[dict]:
         nb_cfg = dict(cfg["neighborhoods"].get(nb) or {})
         if ov.get("est_rent"):
             lst["est_rent"] = float(ov["est_rent"])
+            lst["rent_source"] = "override"
+        elif lst.get("est_rent"):
+            lst["rent_source"] = "avm"
+        else:
+            lst["est_rent"], lst["rent_source"] = estimate_rent(db, lst)
         for k in ("insurance", "prop_tax_rate"):
             if ov.get(k) is not None:
                 nb_cfg[k] = float(ov[k])

@@ -34,7 +34,10 @@ def build_digest(db: DB, cfg: dict) -> tuple[str, str]:
     week_ago = (date.today() - timedelta(days=7)).isoformat()
     notes = export.load_notes()
     listings = export.listing_payload(db, cfg, notes)
+    from .normalize import type_group
     active = [l for l in listings if l["status"] in ("active", "pending")]
+    if not dcfg.get("include_multi_family", False):
+        active = [l for l in active if type_group(l.get("property_type")) != "multi"]
 
     top = [l for l in active if (l.get("score") or 0) >= threshold][: dcfg["max_listings"]]
     crossed = [l for l in active if l.get("breakeven_price") and l["list_price"] and l["list_price"] <= l["breakeven_price"]]

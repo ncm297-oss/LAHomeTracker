@@ -124,8 +124,8 @@ class DB:
         self.insert("request_log", {"source": source, "ts": datetime.now(timezone.utc).isoformat(), "endpoint": endpoint, "n": n, "ok": int(ok)})
 
     def request_counts(self, since: str | None = None) -> dict[str, int]:
-        # Failed calls count too: RentCast bills 401/403 responses against the quota.
-        sql = "SELECT source, SUM(n) AS n FROM request_log WHERE 1=1"
+        # Successful calls only, which is what RentCast's usage dashboard counts.
+        sql = "SELECT source, SUM(n) AS n FROM request_log WHERE ok=1"
         params: tuple = ()
         if since:
             sql += " AND ts >= ?"

@@ -133,7 +133,20 @@ def cmd_enrich(args, db, cfg):
     rc = RentCast(db, cfg)
     if not rc.enabled:
         print("rentcast disabled or no key"); return
-    rows = db.all("SELECT * FROM listings WHERE status='active' AND (est_rent IS NULL OR last_sale_price IS NULL) ORDER BY last_seen DESC LIMIT ?", (args.limit,))
+    # Stay inside the monthly plan: each AVM call is one request.
+    budget = cfg["sources"]["rentcast"].get("monthly_budget")
+    used = db.request_counts(since=date.today().replace(day=1).isoformat()).get("rentcast", 0)
+    if budget:
+        room = max(0, budget - used)
+        if room < args.limit:
+            print(f"rentcast: {used}/{budget} requests used this month; limiting enrich to {room}")
+            args.limit = room
+        if room == 0:
+            return
+    # Highest-scored first so a small request budget goes to the listings that matter.
+    rows = db.all("SELECT l.* FROM listings l LEFT JOIN scores s ON s.listing_id=l.id "
+                  "WHERE l.status='active' AND (l.est_rent IS NULL OR (l.last_sale_price IS NULL AND NOT ?)) "
+                  "ORDER BY s.score DESC NULLS LAST, l.last_seen DESC LIMIT ?", (int(args.rent_only), args.limit))
     for r in rows:
         lst = Listing(address=r["address"], city=r["city"], zip_code=r["zip_code"], state=r["state"] or "CA",
                       property_type=r["property_type"], beds=r["beds"], baths=r["baths"], sqft=r["sqft"])
@@ -251,10 +264,11 @@ def cmd_run_weekly(args, db, cfg):
     cmd_import_csv(ns, db, cfg)
     if cfg["sources"]["gmail"].get("enabled"):
         cmd_import_gmail(ns, db, cfg)
-    # comps monthly
+    # Sold comps (HomeHarvest) monthly; RentCast zip medians every run (30-day disk cache makes repeats free).
     last = db.one("SELECT MAX(fetched_at) AS t FROM comps")
     if not last or not last["t"] or (datetime.now() - datetime.fromisoformat(last["t"])).days >= 30:
-        cmd_comps(ns, db, cfg)
+        cmd_comps(argparse.Namespace(neighborhood=None, source="homeharvest"), db, cfg)
+    cmd_comps(argparse.Namespace(neighborhood=None, source="rentcast"), db, cfg)
     cmd_enrich(ns, db, cfg)
     scored = scoring.score_all(db, cfg)
     summary["scored"] = len(scored)
@@ -294,7 +308,7 @@ def main(argv=None):
     sub.add_parser("status").set_defaults(fn=cmd_status)
     sub.add_parser("gmail-auth", help="one-time OAuth flow; writes token.json").set_defaults(fn=cmd_gmail_auth)
     p = sub.add_parser("digest"); p.add_argument("--dry-run", action="store_true"); p.set_defaults(fn=cmd_digest)
-    p = sub.add_parser("run-weekly"); p.add_argument("--dry-run", action="store_true"); p.add_argument("--enrich-limit", type=int, default=20); p.set_defaults(fn=cmd_run_weekly)
+    p = sub.add_parser("run-weekly"); p.add_argument("--dry-run", action="store_true"); p.add_argument("--enrich-limit", type=int, default=5, help="RentCast AVM calls per run (50/month free tier)"); p.set_defaults(fn=cmd_run_weekly)
 
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO, format="%(levelname)s %(message)s", stream=sys.stderr)
