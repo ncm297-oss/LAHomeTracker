@@ -8,9 +8,10 @@ import sys
 from datetime import date, datetime
 from pathlib import Path
 
-from . import config, dedupe, export, scoring, alerts
+from . import config, dedupe, export, scoring, alerts, rentals
 from .db import DB
-from .models import Listing, PricePoint
+from .models import Listing, PricePoint, Rental
+from .normalize import rental_kind
 from .sources.base import SourceError
 from .sources.fred import FRED
 from .sources.gmail_alerts import GmailAlerts, run_oauth_flow
@@ -286,10 +287,107 @@ def cmd_run_weekly(args, db, cfg):
     print(json.dumps(summary))
 
 
+# ---------------- rentals ----------------
+
+def _rdb(args, cfg):
+    return rentals.open_db(cfg, getattr(args, "rentals_db", None))
+
+
+def _zips(cfg, neighborhood=None) -> list[str]:
+    nbs = [neighborhood] if neighborhood else list(cfg["neighborhoods"])
+    return [z for nb in nbs for z in cfg["neighborhoods"][nb]["zips"]]
+
+
+def cmd_rentals_pull(args, db, cfg, rdb=None) -> bool:
+    """Realtor.com for-rent listings via HomeHarvest. Returns True when every zip came back."""
+    rdb = rdb or _rdb(args, cfg)
+    hh = HomeHarvest(rdb, cfg)
+    if not hh.enabled:
+        print("homeharvest disabled in config"); return False
+    ok, got = True, []
+    for z in _zips(cfg, args.neighborhood):
+        try:
+            got.extend(hh.fetch_rentals([z]))
+        except SourceError as e:
+            log.warning("rentals %s: %s", z, e)
+            ok = False
+    st = rentals.ingest(rdb, got, cfg)
+    print(f"realtor.com: {json.dumps(st)}")
+    return ok and not args.neighborhood
+
+
+def cmd_rentals_import_gmail(args, db, cfg, rdb=None):
+    rdb = rdb or _rdb(args, cfg)
+    ad = GmailAlerts(rdb, cfg)
+    if not ad.enabled or not ad.scfg.get("rental_query"):
+        print("gmail rentals disabled in config"); return
+    try:
+        found = ad.fetch_rental_alerts()
+    except SourceError as e:
+        print(f"gmail: {e}"); return
+    print(f"gmail: {len(found)} homes parsed, {json.dumps(rentals.ingest(rdb, found, cfg))}")
+
+
+def cmd_rentals_add(args, db, cfg):
+    """A rental seen somewhere the tracker can't read: a yard sign, Craigslist, Facebook, a friend."""
+    rdb = _rdb(args, cfg)
+    r = Rental(address=args.address, source=args.source, city=args.city, zip_code=args.zip,
+               neighborhood=config.neighborhood_for(args.zip, args.city, cfg), rent=args.rent, beds=args.beds,
+               baths=args.baths, sqft=args.sqft, property_type=args.type, kind=rental_kind(args.type, None, args.address), url=args.url)
+    if not r.neighborhood:
+        print("zip is outside the tracked neighborhoods"); return
+    rid, is_new, changes = rentals.upsert(rdb, r, cfg)
+    if args.text:
+        notes = rentals.load_notes()
+        n = notes.setdefault(rid, {})
+        n["notes"] = ((n.get("notes") or "") + "\n" + args.text).strip()
+        rentals.save_notes(notes)
+    print(f"{'added' if is_new else 'updated'} {rid} {changes}")
+
+
+def cmd_rental_note(args, db, cfg):
+    rdb = _rdb(args, cfg)
+    row = rentals.find(rdb, args.id)
+    if not row:
+        print("no such rental"); return
+    notes = rentals.load_notes()
+    n = notes.setdefault(row["id"], {})
+    if args.status:
+        if args.status == "clear":
+            n.pop("status", None)
+        else:
+            n["status"] = args.status
+    if args.text:
+        n["notes"] = ((n.get("notes") or "") + "\n" + args.text).strip()
+    if not n:
+        notes.pop(row["id"])
+    rentals.save_notes(notes)
+    print(f"{row['address']}: {json.dumps(n)}")
+
+
+def cmd_rentals_export(args, db, cfg, rdb=None):
+    rdb = rdb or _rdb(args, cfg)
+    print(f"exported rentals {rentals.export(rdb, cfg)}")
+
+
+def cmd_run_rentals(args, db, cfg):
+    """Daily: pull Realtor.com, read rental alert emails, retire vanished listings, export."""
+    rdb = _rdb(args, cfg)
+    t0 = datetime.now()
+    ns = argparse.Namespace(neighborhood=None)
+    pulled_ok = cmd_rentals_pull(ns, db, cfg, rdb)
+    if cfg["sources"]["gmail"].get("enabled"):
+        cmd_rentals_import_gmail(ns, db, cfg, rdb)
+    summary = {"pulled_ok": pulled_ok, "gone": rentals.mark_gone(rdb, cfg, pulled_ok=pulled_ok)}
+    rdb.upsert("runs", {"ts": t0.isoformat(timespec="seconds"), "summary": json.dumps(summary)}, ["ts"])
+    print(json.dumps({**summary, **rentals.export(rdb, cfg)}))
+
+
 def main(argv=None):
     ap = argparse.ArgumentParser(prog="tracker", description="West Side LA housing tracker")
     ap.add_argument("-v", "--verbose", action="store_true")
     ap.add_argument("--db", default=None, help="sqlite path (default data/tracker.sqlite)")
+    ap.add_argument("--rentals-db", default=None, help="rentals sqlite path (default data/rentals.sqlite)")
     sub = ap.add_subparsers(dest="cmd", required=True)
 
     sub.add_parser("init").set_defaults(fn=cmd_init)
@@ -309,6 +407,18 @@ def main(argv=None):
     sub.add_parser("gmail-auth", help="one-time OAuth flow; writes token.json").set_defaults(fn=cmd_gmail_auth)
     p = sub.add_parser("digest"); p.add_argument("--dry-run", action="store_true"); p.set_defaults(fn=cmd_digest)
     p = sub.add_parser("run-weekly"); p.add_argument("--dry-run", action="store_true"); p.add_argument("--enrich-limit", type=int, default=5, help="RentCast AVM calls per run (50/month free tier)"); p.set_defaults(fn=cmd_run_weekly)
+
+    p = sub.add_parser("rentals-pull", help="for-rent homes from Realtor.com (HomeHarvest)"); p.add_argument("--neighborhood"); p.set_defaults(fn=cmd_rentals_pull)
+    sub.add_parser("rentals-import-gmail", help="parse saved rental-search alert emails").set_defaults(fn=cmd_rentals_import_gmail)
+    p = sub.add_parser("rentals-add", help="add a rental by hand (yard sign, Craigslist, word of mouth)")
+    p.add_argument("--address", required=True); p.add_argument("--zip", required=True); p.add_argument("--city"); p.add_argument("--rent", type=float, required=True)
+    p.add_argument("--beds", type=float); p.add_argument("--baths", type=float); p.add_argument("--sqft", type=float)
+    p.add_argument("--type", help="house, townhome, condo, duplex"); p.add_argument("--url"); p.add_argument("--source", default="manual", help="e.g. craigslist, sign, facebook")
+    p.add_argument("--text", help="note"); p.set_defaults(fn=cmd_rentals_add)
+    p = sub.add_parser("rental-note", help="triage status / notes for a rental"); p.add_argument("id", help="rental id or address fragment")
+    p.add_argument("--status", choices=rentals.TRIAGE + ["clear"]); p.add_argument("--text"); p.set_defaults(fn=cmd_rental_note)
+    sub.add_parser("rentals-export", help="write docs/data/rentals.json").set_defaults(fn=cmd_rentals_export)
+    sub.add_parser("run-rentals", help="daily rentals job: pull, alerts, retire, export").set_defaults(fn=cmd_run_rentals)
 
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO, format="%(levelname)s %(message)s", stream=sys.stderr)

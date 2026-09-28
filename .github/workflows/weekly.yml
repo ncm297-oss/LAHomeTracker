@@ -53,4 +53,5 @@ jobs:
           git config user.email "tracker-bot@users.noreply.github.com"
           git add data/tracker.sqlite docs/data/*.json
           git diff --cached --quiet && echo "no changes" || git commit -m "Weekly data refresh $(date -u +%F)"
+          git pull --rebase   # the daily rentals job may have pushed meanwhile
           git push

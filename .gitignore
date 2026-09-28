@@ -15,4 +15,5 @@ credentials.json
 .pytest_cache/
 
 !data/tracker.sqlite
+!data/rentals.sqlite
 

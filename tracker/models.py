@@ -70,3 +70,38 @@ class Listing:
         d["address_norm"] = self.address_norm
         d["sources"] = ",".join(sorted(set(self.sources)))
         return d
+
+
+@dataclass
+class Rental:
+    """One for-rent home as seen by one source. tracker/rentals.py merges these by address."""
+    address: str
+    source: str                     # realtor.com | zillow | apartments.com | redfin | manual | ...
+    city: str | None = None
+    zip_code: str | None = None
+    neighborhood: str | None = None
+    rent: float | None = None
+    beds: float | None = None
+    baths: float | None = None
+    sqft: float | None = None
+    property_type: str | None = None   # as the source labels it
+    kind: str | None = None            # house | townhome | condo | duplex (normalize.rental_kind)
+    year_built: int | None = None
+    lot_sqft: float | None = None
+    listed_date: str | None = None
+    available_date: str | None = None
+    latitude: float | None = None
+    longitude: float | None = None
+    photo: str | None = None
+    description: str | None = None
+    listed_by: str | None = None
+    url: str | None = None
+    feed: str | None = None            # upstream feed code when the source is an aggregator (Realtor.com "mls")
+
+    @property
+    def address_norm(self) -> str:
+        return normalize_address(self.address, self.zip_code)
+
+    @property
+    def id(self) -> str:
+        return hashlib.sha1(f"rent:{self.address_norm}".encode()).hexdigest()[:16]

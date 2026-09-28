@@ -10,6 +10,7 @@ Built in phases:
 | 1B | Financing scenarios (mortgage, delayed financing, DTI, deductions) | done |
 | 2 | SQLite listing tracker with deal scoring, market panel, rate monitoring | done |
 | 3 | Weekly automated triage + email digest (GitHub Actions) | done — needs secrets |
+| 4 | Rental search: daily Realtor.com pull + rental alert emails, `docs/rentals.html` | done |
 
 ## Phase 1: the calculator
 
@@ -138,3 +139,35 @@ python -m tracker run-weekly --dry-run
 ```
 
 Then push, add the secrets, and trigger *Weekly triage → Run workflow* once to confirm the commit and the email arrive. `data/scenarios.yaml` holds saved financing scenarios (name + rate) for the refi alert; thresholds live under `alerts:` in `config.yaml`.
+
+## Phase 4: rental search
+
+`docs/rentals.html` lists every for-rent house/townhome in the tracked zips, merged across sources, with a link to each site's posting plus a one-click Zillow address search and a web search. Criteria live under `rentals:` in `config.yaml` (default $6,000–7,500, 3+ beds, 1,400+ sqft, house or townhome). A **match** meets all of them (unknown sqft still counts); a **near miss** fails exactly one.
+
+Only free, low-risk sources are used:
+
+| Source | How | Covers |
+|---|---|---|
+| Realtor.com | HomeHarvest `for_rent`, one request per zip, daily | MLS lease listings (most agent-listed Westside homes) plus feeds Realtor.com takes from Zillow, Zumper, Apartment List, Avail |
+| Saved-search alert emails | Gmail adapter (`sources.gmail.rental_query`) | Whatever your saved searches on Zillow, Apartments.com (also feeds Westside Rentals), Redfin, HotPads, Trulia, Zumper send |
+| By hand | `rentals-add` | Yard signs, Craigslist, Facebook, word of mouth |
+
+Zillow, Redfin, Apartments.com/Westside Rentals and Craigslist are deliberately not scraped (their terms forbid it, and Zillow blocks bots outright); their alert emails are the sanctioned way in. To get Apartments.com-only listings (the main gap in Zillow's coverage), save a search on apartments.com with email alerts on, and do the same on Zillow.
+
+Property types are cleaned up on the way in: a "condo" whose description says townhome counts as a townhome, and a "house" or "townhome" with a 3+ digit unit number (`Apt 703`) and no townhome wording counts as a condo. A home is marked **gone** after 3 days missing from the daily pull, or 21 days after its last alert email if no pull ever saw it.
+
+Rentals live in their own database, `data/rentals.sqlite`, so the daily commit stays small and never touches `tracker.sqlite`.
+
+```bash
+python -m tracker run-rentals                  # pull + alert emails + retire vanished + export (what the daily job runs)
+python -m tracker rentals-pull [--neighborhood X]
+python -m tracker rentals-import-gmail
+python -m tracker rentals-add --address "3549 Schaefer St" --zip 90232 --rent 6395 --beds 3 --sqft 1400 --source craigslist --url "https://..."
+python -m tracker rental-note "Schaefer" --status shortlist --text "utilities included"   # shortlist|contacted|toured|applied|pass|clear
+python -m tracker rentals-export
+```
+
+Triage status and notes go in `data/rental_notes.yaml` (editable on GitHub). Shortlisted homes pin to the top of the page; passed ones are hidden by default.
+
+`.github/workflows/rentals.yml` runs daily at 08:00 Pacific (and on demand) and commits `data/rentals.sqlite` + `docs/data/rentals.json`. No email; the page is the output. The alert-email step needs the same `GMAIL_TOKEN_JSON` secret as Phase 3 and is skipped without it.
+

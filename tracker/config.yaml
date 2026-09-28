@@ -105,6 +105,8 @@ sources:
   gmail:
     enabled: true
     query: 'newer_than:8d (from:redfin.com OR from:zillow.com OR subject:"price" OR subject:"new listing")'
+    # Saved rental-search alerts (Zillow, Apartments.com / Westside Rentals, Redfin, HotPads, Trulia, Zumper).
+    rental_query: 'newer_than:3d (from:zillow.com OR from:apartments.com OR from:westsiderentals.com OR from:redfin.com OR from:hotpads.com OR from:trulia.com OR from:zumper.com)'
   redfin_csv:
     enabled: true
     inbox: data/inbox
@@ -112,6 +114,21 @@ sources:
     enabled: true
   redfin_datacenter:
     enabled: false                # multi-hundred-MB files; import manually from data/inbox
+
+# Rental search (docs/rentals.html). Separate database so the daily job commits a small
+# file instead of tracker.sqlite. Pulls cover the same neighborhood zips as above.
+rentals:
+  db: data/rentals.sqlite
+  rent: [6000, 7500]            # target band
+  min_beds: 3
+  min_sqft: 1400                # listings with unknown sqft still count as matches
+  match_types: [house, townhome]
+  pull:                         # a wider net, so near misses and rent changes into the band are caught
+    price_min: 5500
+    price_max: 8000
+    beds_min: 2
+  gone_after_days: 3            # not seen by a daily pull for this long -> marked gone
+  email_stale_days: 21          # rentals only seen in alert emails drop off after this
 
 digest:
   max_listings: 15

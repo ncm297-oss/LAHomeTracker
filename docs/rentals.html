@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="color-scheme" content="light dark">
+<title>Rentals — West LA</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<header>
+  <h1>Rentals</h1>
+  <p class="sub"><a href="dashboard.html">Listing tracker</a> · <a href="index.html">Cash calculator</a> · <span id="generated">loading…</span></p>
+</header>
+
+<main>
+  <section class="card">
+    <div class="metrics" id="summary"></div>
+    <p class="hint" id="criteria"></p>
+  </section>
+
+  <section class="card">
+    <div class="filters">
+      <label>Neighborhood <select id="f-nb"><option value="">All</option></select></label>
+      <label>Show <select id="f-fit"><option value="match">Matches</option><option value="near">Matches + near misses</option><option value="">Everything in range</option></select></label>
+      <label>Type <select id="f-type"><option value="home">Houses &amp; townhomes</option><option value="condo">+ condos</option><option value="">All</option></select></label>
+      <label>Status <select id="f-status"><option value="active">On the market</option><option value="gone">Gone</option><option value="">All</option></select></label>
+      <label>Our list <select id="f-triage"><option value="nopass">Hide passed</option><option value="shortlist">Shortlist+</option><option value="">Everything</option></select></label>
+      <label>Sort <select id="f-sort"><option value="new">Newest</option><option value="rent">Rent ↑</option><option value="rentd">Rent ↓</option><option value="sqft">Size ↓</option><option value="ppsf">$/sqft ↑</option></select></label>
+    </div>
+    <p class="hint" id="count"></p>
+    <div id="rentals"></div>
+  </section>
+
+  <section class="card how">
+    <h2>How this works</h2>
+    <ol>
+      <li>A daily job pulls every for-rent home in the tracked zips from Realtor.com, which carries MLS lease listings plus feeds from Zillow, Zumper and others. Homes that stop showing up for 3 days are marked gone.</li>
+      <li>Saved-search alert emails from Zillow, Apartments.com (which also feeds Westside Rentals), Redfin, HotPads, Trulia and Zumper are read from Gmail, once Gmail is connected. That's how homes listed only on those sites get in.</li>
+      <li>Every home has a <b>Zillow</b> and a <b>web search</b> link, so you can see where else it's posted in one click.</li>
+      <li>Saw a sign or a Craigslist post? <code>python -m tracker rentals-add --address "…" --zip 90066 --rent 6500 --beds 3 --source sign</code></li>
+      <li>Triage: <code>python -m tracker rental-note "Wade St" --status shortlist --text "call Tue"</code> (statuses: shortlist, contacted, toured, applied, pass). Notes live in <code>data/rental_notes.yaml</code> and can be edited on GitHub too.</li>
+    </ol>
+  </section>
+</main>
+
+<footer><small>Static page over docs/data/rentals.json · refreshed daily</small></footer>
+
+<script src="rentals.js"></script>
+</body>
+</html>

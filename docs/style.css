@@ -134,3 +134,15 @@ input[type="range"] { padding: 0; accent-color: var(--accent); }
 .how ol { padding-left: 20px; margin: 0; font-size: .9rem; }
 .how li { margin-bottom: 6px; }
 code { font-size: .85em; }
+/* rentals */
+.rental summary { grid-template-columns: 72px 1fr auto; }
+.rental .thumb { width: 72px; height: 54px; object-fit: cover; border-radius: 6px; background: var(--bg); display: block; }
+.rental .thumb.none { border: 1px dashed var(--line); }
+.rental .addr .facts { margin: 2px 0 0; }
+.rental .facts .neg { color: var(--bad); font-weight: 600; }
+.rental .body { padding-left: 82px; }
+.rental .desc { color: var(--muted); font-size: .8rem; margin: 6px 0; }
+.chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 2px 0 6px; }
+.chip { font-size: .78rem; padding: 3px 10px; border-radius: 999px; border: 1px solid var(--accent); color: var(--accent); text-decoration: none; }
+.chip.ghost-chip { border-color: var(--line); color: var(--muted); }
+@media (max-width: 480px) { .rental summary { grid-template-columns: 56px 1fr auto; } .rental .thumb { width: 56px; height: 44px; } .rental .body { padding-left: 0; } }
