@@ -169,5 +169,7 @@ python -m tracker rentals-export
 
 Triage status and notes go in `data/rental_notes.yaml` (editable on GitHub). Shortlisted homes pin to the top of the page; passed ones are hidden by default.
 
-`.github/workflows/rentals.yml` runs daily at 08:00 Pacific (and on demand) and commits `data/rentals.sqlite` + `docs/data/rentals.json`. No email; the page is the output. The alert-email step needs the same `GMAIL_TOKEN_JSON` secret as Phase 3 and is skipped without it.
+`.github/workflows/rentals.yml` runs daily at 08:00 Pacific (and on demand; GitHub often starts scheduled runs hours late) and commits `data/rentals.sqlite` + `docs/data/rentals.json`. The page is the output.
+
+**New-listing notice.** When a run finds homes first seen in the zips under `rentals.notify` (default 90232: Park East and Lucerne-Higuera) that haven't been announced yet, the workflow opens a GitHub issue listing them that @mentions `rentals.notify.mention`; GitHub emails the mention, so no mail credentials are involved. Each home is announced once (`rental_notified` table). `python -m tracker rentals-notify --dry-run` writes the notice to `data/cache/new_rentals.md` without marking anything. The alert-email step needs the same `GMAIL_TOKEN_JSON` secret as Phase 3 and is skipped without it.
 

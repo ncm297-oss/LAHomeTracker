@@ -370,8 +370,31 @@ def cmd_rentals_export(args, db, cfg, rdb=None):
     print(f"exported rentals {rentals.export(rdb, cfg)}")
 
 
+NOTICE_TITLE = config.DATA_DIR / "cache" / "new_rentals_title.txt"
+NOTICE_BODY = config.DATA_DIR / "cache" / "new_rentals.md"
+
+
+def cmd_rentals_notify(args, db, cfg, rdb=None) -> int:
+    """Write the new-listing notice for the workflow to post as a GitHub issue, and remember
+    which homes it covered so a rerun doesn't announce them twice."""
+    rdb = rdb or _rdb(args, cfg)
+    for p in (NOTICE_TITLE, NOTICE_BODY):
+        p.unlink(missing_ok=True)
+    rows = rentals.to_notify(rdb, cfg)
+    if not rows:
+        print("notify: nothing new"); return 0
+    title, body = rentals.notice(rows, cfg)
+    NOTICE_BODY.parent.mkdir(parents=True, exist_ok=True)
+    NOTICE_TITLE.write_text(title, encoding="utf-8")
+    NOTICE_BODY.write_text(body, encoding="utf-8")
+    if not getattr(args, "dry_run", False):
+        rentals.mark_notified(rdb, [r["id"] for r in rows])
+    print(f"notify: {title}")
+    return len(rows)
+
+
 def cmd_run_rentals(args, db, cfg):
-    """Daily: pull Realtor.com, read rental alert emails, retire vanished listings, export."""
+    """Daily: pull Realtor.com, read rental alert emails, retire vanished listings, export, notify."""
     rdb = _rdb(args, cfg)
     t0 = datetime.now()
     ns = argparse.Namespace(neighborhood=None)
@@ -379,6 +402,7 @@ def cmd_run_rentals(args, db, cfg):
     if cfg["sources"]["gmail"].get("enabled"):
         cmd_rentals_import_gmail(ns, db, cfg, rdb)
     summary = {"pulled_ok": pulled_ok, "gone": rentals.mark_gone(rdb, cfg, pulled_ok=pulled_ok)}
+    summary["notified"] = cmd_rentals_notify(ns, db, cfg, rdb)
     rdb.upsert("runs", {"ts": t0.isoformat(timespec="seconds"), "summary": json.dumps(summary)}, ["ts"])
     print(json.dumps({**summary, **rentals.export(rdb, cfg)}))
 
@@ -418,7 +442,9 @@ def main(argv=None):
     p = sub.add_parser("rental-note", help="triage status / notes for a rental"); p.add_argument("id", help="rental id or address fragment")
     p.add_argument("--status", choices=rentals.TRIAGE + ["clear"]); p.add_argument("--text"); p.set_defaults(fn=cmd_rental_note)
     sub.add_parser("rentals-export", help="write docs/data/rentals.json").set_defaults(fn=cmd_rentals_export)
-    sub.add_parser("run-rentals", help="daily rentals job: pull, alerts, retire, export").set_defaults(fn=cmd_run_rentals)
+    p = sub.add_parser("rentals-notify", help="write the new-listing notice (data/cache/new_rentals.md) for the notify zips")
+    p.add_argument("--dry-run", action="store_true", help="write the notice but don't mark the homes as announced"); p.set_defaults(fn=cmd_rentals_notify)
+    sub.add_parser("run-rentals", help="daily rentals job: pull, alerts, retire, export, notify").set_defaults(fn=cmd_run_rentals)
 
     args = ap.parse_args(argv)
     logging.basicConfig(level=logging.DEBUG if args.verbose else logging.INFO, format="%(levelname)s %(message)s", stream=sys.stderr)

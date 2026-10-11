@@ -136,3 +136,29 @@ def test_export_payload(rdb, cfg, tmp_path):
     wade = next(r for r in doc["rentals"] if r["address"] == "4058 Wade St")
     assert wade["fit"] == "near" and wade["misses"] == ["rent"] and wade["days_listed"] == 8
     assert wade["links"][0]["source"] == "realtor.com"
+
+
+def test_notify_new_homes_in_notify_zips_once(rdb, cfg):
+    cfg["rentals"]["notify"] = {"zips": ["90232"], "mention": "someone", "lookback_days": 2}
+    cc = dict(city="Culver City", zip_code="90232", neighborhood="culver_city")
+    rentals.upsert(rdb, _r(address="4170 Madison Ave", rent=5995, beds=4, sqft=1940, kind="house", **cc), cfg, today="2026-10-01")  # old
+    rentals.upsert(rdb, _r(address="9051 Lucerne Ave Unit C", rent=7000, sqft=1360, kind="house", **cc), cfg, today="2026-10-11")
+    rentals.upsert(rdb, _r(address="4163 Lincoln Ave", rent=6495, sqft=1910, kind="house", **cc), cfg, today="2026-10-10")
+    rentals.upsert(rdb, _r(), cfg, today="2026-10-11")                     # new, but Santa Monica
+    rows = rentals.to_notify(rdb, cfg, today="2026-10-11")
+    assert [r["address"] for r in rows] == ["4163 Lincoln Ave", "9051 Lucerne Ave Unit C"]
+    title, body = rentals.notice(rows, cfg, today="2026-10-11")
+    assert title == "2 new rentals in 90232 (2026-10-11)"
+    assert body.startswith("@someone ")
+    assert "**9051 Lucerne Ave Unit C**" in body and "near miss (sqft)" in body and "$6,495/mo" in body
+    assert "](https://www.realtor.com/rentals/details/x)" in body
+    # Announced once: a rerun the same day, or the next day, stays quiet.
+    rentals.mark_notified(rdb, [r["id"] for r in rows], today="2026-10-11")
+    assert rentals.to_notify(rdb, cfg, today="2026-10-11") == []
+    assert rentals.to_notify(rdb, cfg, today="2026-10-12") == []
+
+
+def test_notify_off_without_zips(rdb, cfg):
+    cfg["rentals"]["notify"] = {"zips": []}
+    rentals.upsert(rdb, _r(zip_code="90232", neighborhood="culver_city"), cfg, today="2026-10-11")
+    assert rentals.to_notify(rdb, cfg, today="2026-10-11") == []

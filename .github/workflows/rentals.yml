@@ -7,6 +7,7 @@ on:
 
 permissions:
   contents: write
+  issues: write              # new-listing notice (see the last step)
 
 concurrency:
   group: rentals
@@ -45,3 +46,12 @@ jobs:
           git commit -m "Rentals refresh $(date -u +%F)"
           git pull --rebase
           git push
+
+      # run-rentals writes a notice when homes appear in rentals.notify.zips. The issue
+      # @mentions the owner, and GitHub emails the mention: no mail credentials needed.
+      - name: Announce new listings
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          [ -f data/cache/new_rentals.md ] || { echo "nothing new"; exit 0; }
+          gh issue create --title "$(cat data/cache/new_rentals_title.txt)" --body-file data/cache/new_rentals.md

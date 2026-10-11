@@ -45,6 +45,10 @@ CREATE TABLE IF NOT EXISTS rental_price_history (
   rental_id TEXT NOT NULL, date TEXT NOT NULL, rent REAL NOT NULL, event TEXT, source TEXT,
   UNIQUE(rental_id, date, rent)
 );
+
+CREATE TABLE IF NOT EXISTS rental_notified (
+  rental_id TEXT PRIMARY KEY, date TEXT NOT NULL
+);
 """
 
 _FILL = ["city", "zip_code", "neighborhood", "beds", "baths", "sqft", "property_type", "kind", "year_built",
@@ -179,6 +183,56 @@ def mark_gone(db: DB, cfg: dict, today: str | None = None, pulled_ok: bool = Tru
             db.update("rentals", r["id"], {"status": "gone", "gone_date": today})
             n += 1
     return n
+
+
+# ---------------- new-listing notice ----------------
+
+def to_notify(db: DB, cfg: dict, today: str | None = None) -> list[dict]:
+    """Active homes in the notify zips first seen within `lookback_days` and not announced yet."""
+    nc = cfg["rentals"].get("notify") or {}
+    zips = [str(z) for z in nc.get("zips") or []]
+    if not zips:
+        return []
+    today = today or date.today().isoformat()
+    since = (date.fromisoformat(today) - timedelta(days=nc.get("lookback_days", 2))).isoformat()
+    ph = ",".join("?" * len(zips))
+    rows = db.all(f"SELECT * FROM rentals WHERE status='active' AND zip_code IN ({ph}) AND first_seen>=? "
+                  "AND id NOT IN (SELECT rental_id FROM rental_notified) ORDER BY rent", (*zips, since))
+    for r in rows:
+        r["fit"], r["misses"] = fit(r, cfg)
+        r["links"] = db.all("SELECT source, url FROM rental_links WHERE rental_id=? AND url!='' ORDER BY first_seen", (r["id"],))
+    return rows
+
+
+def notice(rows: list[dict], cfg: dict, today: str | None = None) -> tuple[str, str]:
+    """(issue title, markdown body) for the GitHub issue that emails the owner."""
+    nc = cfg["rentals"]["notify"]
+    today = today or date.today().isoformat()
+    zips = ", ".join(str(z) for z in nc["zips"])
+    title = f"{len(rows)} new rental{'s' if len(rows) != 1 else ''} in {zips} ({today})"
+    fit_label = {"match": "match", "near": "near miss", "out": "outside criteria"}
+    L = [f"@{nc['mention']} new for-rent homes in {zips} since the last refresh:", ""]
+    for r in rows:
+        spec = ", ".join(x for x in (
+            f"${r['rent']:,.0f}/mo" if r.get("rent") else "rent unknown",
+            f"{r['beds']:g} bd" if r.get("beds") else None,
+            f"{r['baths']:g} ba" if r.get("baths") else None,
+            f"{r['sqft']:,.0f} sqft" if r.get("sqft") else None,
+            r.get("kind"),
+        ) if x)
+        verdict = fit_label[r["fit"]] + (f" ({', '.join(r['misses'])})" if r["misses"] else "")
+        L.append(f"- **{r['address']}**, {r.get('city') or ''} {r.get('zip_code') or ''}: {spec}; {verdict}")
+        for l in r["links"]:
+            L.append(f"  - [{l['source']}]({l['url']})")
+    L += ["", "All listings: https://ncm297-oss.github.io/LAHomeTracker/rentals.html",
+          "", "_Opened by the daily rentals job. Close it when you've looked._"]
+    return title, "\n".join(L)
+
+
+def mark_notified(db: DB, ids: list[str], today: str | None = None) -> None:
+    today = today or date.today().isoformat()
+    for rid in ids:
+        db.insert_ignore("rental_notified", {"rental_id": rid, "date": today})
 
 
 # ---------------- notes ----------------
