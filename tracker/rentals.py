@@ -187,17 +187,36 @@ def mark_gone(db: DB, cfg: dict, today: str | None = None, pulled_ok: bool = Tru
 
 # ---------------- new-listing notice ----------------
 
+def inside(lat: float, lon: float, polygon: list) -> bool:
+    """Point in polygon (ray casting); polygon is [[lat, lon], ...]."""
+    hit, j = False, len(polygon) - 1
+    for i, (yi, xi) in enumerate(polygon):
+        yj, xj = polygon[j]
+        if (yi > lat) != (yj > lat) and lon < (xj - xi) * (lat - yi) / (yj - yi) + xi:
+            hit = not hit
+        j = i
+    return hit
+
+
+def notify_scope(nc: dict) -> str:
+    """'90232, Park West' — the zips and area names a notice covers."""
+    return ", ".join([str(z) for z in nc.get("zips") or []] + [a["name"] for a in (nc.get("areas") or {}).values()])
+
+
 def to_notify(db: DB, cfg: dict, today: str | None = None) -> list[dict]:
-    """Active homes in the notify zips first seen within `lookback_days` and not announced yet."""
+    """Active homes first seen within `lookback_days`, not announced yet, that are in a notify zip
+    or inside a notify area's outline. Area matching needs coordinates, which hand-added homes lack."""
     nc = cfg["rentals"].get("notify") or {}
-    zips = [str(z) for z in nc.get("zips") or []]
-    if not zips:
+    zips = {str(z) for z in nc.get("zips") or []}
+    polygons = [a["polygon"] for a in (nc.get("areas") or {}).values()]
+    if not zips and not polygons:
         return []
     today = today or date.today().isoformat()
     since = (date.fromisoformat(today) - timedelta(days=nc.get("lookback_days", 2))).isoformat()
-    ph = ",".join("?" * len(zips))
-    rows = db.all(f"SELECT * FROM rentals WHERE status='active' AND zip_code IN ({ph}) AND first_seen>=? "
-                  "AND id NOT IN (SELECT rental_id FROM rental_notified) ORDER BY rent", (*zips, since))
+    rows = [r for r in db.all("SELECT * FROM rentals WHERE status='active' AND first_seen>=? "
+                              "AND id NOT IN (SELECT rental_id FROM rental_notified) ORDER BY rent", (since,))
+            if r["zip_code"] in zips
+            or (r["latitude"] is not None and any(inside(r["latitude"], r["longitude"], p) for p in polygons))]
     for r in rows:
         r["fit"], r["misses"] = fit(r, cfg)
         r["links"] = db.all("SELECT source, url FROM rental_links WHERE rental_id=? AND url!='' ORDER BY first_seen", (r["id"],))
@@ -208,7 +227,7 @@ def notice(rows: list[dict], cfg: dict, today: str | None = None) -> tuple[str, 
     """(issue title, markdown body) for the GitHub issue that emails the owner."""
     nc = cfg["rentals"]["notify"]
     today = today or date.today().isoformat()
-    zips = ", ".join(str(z) for z in nc["zips"])
+    zips = notify_scope(nc)
     title = f"{len(rows)} new rental{'s' if len(rows) != 1 else ''} in {zips} ({today})"
     fit_label = {"match": "match", "near": "near miss", "out": "outside criteria"}
     L = [f"@{nc['mention']} new for-rent homes in {zips} since the last refresh:", ""]

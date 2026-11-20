@@ -1,3 +1,4 @@
+import copy
 from pathlib import Path
 
 import pytest
@@ -13,7 +14,8 @@ FIX = Path(__file__).parent / "fixtures"
 
 @pytest.fixture
 def cfg():
-    return config.load()
+    # config.load() is cached; tests that edit it get their own copy.
+    return copy.deepcopy(config.load())
 
 
 @pytest.fixture
@@ -156,6 +158,24 @@ def test_notify_new_homes_in_notify_zips_once(rdb, cfg):
     rentals.mark_notified(rdb, [r["id"] for r in rows], today="2026-10-11")
     assert rentals.to_notify(rdb, cfg, today="2026-10-11") == []
     assert rentals.to_notify(rdb, cfg, today="2026-10-12") == []
+
+
+def test_notify_area_outline_narrows_a_zip(rdb, cfg):
+    # Park West uses the real outline from config.yaml; the rest of 90230 stays quiet.
+    areas = cfg["rentals"]["notify"]["areas"]
+    cfg["rentals"]["notify"] = {"zips": [], "areas": areas, "mention": "someone", "lookback_days": 2}
+    cc = dict(city="Culver City", zip_code="90230", neighborhood="culver_city")
+    rentals.upsert(rdb, _r(address="10825 Garfield Ave", latitude=34.00888, longitude=-118.401581, **cc), cfg, today="2026-11-20")
+    rentals.upsert(rdb, _r(address="12024 Alberta Dr", latitude=33.9935, longitude=-118.4176, **cc), cfg, today="2026-11-20")  # Del Rey side
+    rentals.upsert(rdb, _r(address="11222 Greenlawn Ave", **cc), cfg, today="2026-11-20")                                       # no coordinates
+    rows = rentals.to_notify(rdb, cfg, today="2026-11-20")
+    assert [r["address"] for r in rows] == ["10825 Garfield Ave"]
+    assert rentals.notice(rows, cfg, today="2026-11-20")[0] == "1 new rental in Park West (2026-11-20)"
+
+
+def test_inside():
+    square = [[0, 0], [0, 1], [1, 1], [1, 0]]
+    assert rentals.inside(0.5, 0.5, square) and not rentals.inside(1.5, 0.5, square)
 
 
 def test_notify_off_without_zips(rdb, cfg):
