@@ -130,7 +130,7 @@ rentals:
   gone_after_days: 3            # not seen by a daily pull for this long -> marked gone
   email_stale_days: 21          # rentals only seen in alert emails drop off after this
   notify:                       # the daily job opens a GitHub issue (@mention -> email) for homes new in these zips
-    zips: ["90232"]             # Park East + Lucerne-Higuera, Culver City
+    zips: ["90232", "90230"]    # 90232: Park East, Lucerne-Higuera; 90230: Park West, plus the rest of west Culver City
     mention: ncm297-oss
     lookback_days: 2            # only homes first seen this recently, so a new zip doesn't announce its backlog
 
